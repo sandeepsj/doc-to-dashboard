@@ -18,9 +18,10 @@ const fadeUp = {
 interface Props {
   section: DashboardSection
   index: number
+  isBeingRead?: boolean
 }
 
-export function SectionRenderer({ section, index }: Props) {
+export function SectionRenderer({ section, index, isBeingRead = false }: Props) {
   const content = renderSection(section)
   if (!content) return null
 
@@ -30,6 +31,13 @@ export function SectionRenderer({ section, index }: Props) {
       initial="hidden"
       animate="visible"
       transition={{ delay: Math.min(index * 0.04, 0.4) }}
+      style={{
+        borderLeft: isBeingRead ? '3px solid var(--text-accent)' : '3px solid transparent',
+        paddingLeft: '12px',
+        background: isBeingRead ? 'rgba(124,58,237,0.04)' : 'transparent',
+        borderRadius: '4px',
+        transition: 'border-color 0.3s ease, background 0.3s ease',
+      }}
     >
       {content}
     </motion.div>
@@ -53,7 +61,7 @@ function renderSection(section: DashboardSection) {
     case 'paragraph':
       return <ParagraphSection section={section} />
     case 'hr':
-      return <hr className="border-t border-gray-200 dark:border-gray-700 my-2" />
+      return <hr className="border-t my-2" style={{ borderColor: 'var(--border)' }} />
     default:
       return null
   }

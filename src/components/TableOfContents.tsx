@@ -15,7 +15,7 @@ export function TableOfContents({ headings, activeHeadingId }: Props) {
 
   return (
     <aside
-      className="hidden xl:flex flex-col fixed top-12 right-0 bottom-0 w-56 py-8 px-5 overflow-y-auto"
+      className="hidden xl:flex flex-col fixed top-12 right-0 bottom-0 w-56 py-8 px-5 overflow-y-auto z-10"
       style={{
         background: 'var(--toc-bg)',
         borderLeft: '1px solid var(--toc-border)',

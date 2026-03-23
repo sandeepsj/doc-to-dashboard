@@ -4,6 +4,9 @@ import { TableOfContents } from './TableOfContents'
 import { SectionRenderer } from './SectionRenderer'
 import { MobileToc } from './MobileToc'
 import { ThemeToggle } from './ThemeToggle'
+import { ReadingControls } from './ReadingControls'
+import { useReader } from '../hooks/useReader'
+import { LocalServerBackend } from '../backends/localServerBackend'
 import type { ParsedDocument } from '../types'
 
 interface Props {
@@ -22,6 +25,15 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
   const [tocOpen, setTocOpen] = useState(false)
   const mainRef = useRef<HTMLDivElement>(null)
 
+  // Reader — uses local read-loud server directly
+  const backendRef = useRef(new LocalServerBackend())
+  const { status: readerStatus, activeSectionIndex, speed, voice, voices, startReading, togglePause, stopReading, setSpeed, setVoice, refreshVoices } = useReader({
+    backend: backendRef.current,
+    sections: activeDoc.sections,
+    activeDocId,
+  })
+
+  // Scroll-spy
   useEffect(() => {
     const headingIds = activeDoc.headings.map((h) => h.id)
     if (headingIds.length === 0) return
@@ -37,6 +49,7 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
     return () => observer.disconnect()
   }, [activeDoc.id, activeDoc.headings])
 
+  // Reset on doc change
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0
     setActiveHeadingId(null)
@@ -44,10 +57,22 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
     setTocOpen(false)
   }, [activeDocId])
 
+  // Lock body scroll when drawer open
   useEffect(() => {
     document.body.style.overflow = sidebarOpen || tocOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [sidebarOpen, tocOpen])
+
+  // Auto-scroll to the section being read
+  useEffect(() => {
+    if (activeSectionIndex === null || !mainRef.current) return
+    const article = mainRef.current.querySelector('article')
+    if (!article) return
+    const sectionEl = article.children[activeSectionIndex] as HTMLElement | undefined
+    if (sectionEl) {
+      sectionEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [activeSectionIndex])
 
   const currentHeading = activeDoc.headings.find((h) => h.id === activeHeadingId)
 
@@ -128,6 +153,18 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
             <span className="hidden sm:block text-[11px] px-2 py-0.5 rounded-full font-mono" style={{ color: 'var(--text-faint)', background: 'var(--bg-subtle)' }}>
               {activeDoc.sections.length} sections
             </span>
+            <ReadingControls
+              status={readerStatus}
+              speed={speed}
+              voice={voice}
+              voices={voices}
+              onStart={() => startReading()}
+              onTogglePause={togglePause}
+              onStop={stopReading}
+              onSpeedChange={setSpeed}
+              onVoiceChange={setVoice}
+              onRefreshVoices={refreshVoices}
+            />
             <ThemeToggle theme={theme} onToggle={onToggleTheme} />
           </div>
         </header>
@@ -137,7 +174,12 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
           <div className="xl:pr-56">
             <article className="max-w-3xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-10 space-y-4 md:space-y-5">
               {activeDoc.sections.map((section, i) => (
-                <SectionRenderer key={i} section={section} index={i} />
+                <SectionRenderer
+                  key={i}
+                  section={section}
+                  index={i}
+                  isBeingRead={activeSectionIndex === i}
+                />
               ))}
               <div className="h-16" />
             </article>

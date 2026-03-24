@@ -35,6 +35,30 @@ function fixSvgViewBox(container: HTMLElement) {
   }
 }
 
+/**
+ * Fix known Mermaid syntax limitations before rendering.
+ * - quadrantChart: strip parentheses from point labels (lexer rejects them)
+ */
+function sanitizeMermaid(source: string): string {
+  const first = source.trimStart().toLowerCase()
+  if (first.startsWith('quadrantchart')) {
+    return source
+      .split('\n')
+      .map((line) => {
+        // Data point lines look like:  Label text: [x, y]
+        const m = line.match(/^(\s*)(.+?)(\s*:\s*\[[\d.,\s]+\]\s*)$/)
+        if (m) {
+          // Strip parentheses from label only (not from the coords bracket)
+          const clean = m[2].replace(/[()]/g, '')
+          return `${m[1]}${clean}${m[3]}`
+        }
+        return line
+      })
+      .join('\n')
+  }
+  return source
+}
+
 export function MermaidSection({ section }: Props) {
   const rawId = useId()
   const uid = `mermaid-${rawId.replace(/:/g, '')}`
@@ -64,7 +88,7 @@ export function MermaidSection({ section }: Props) {
       })
 
       try {
-        const { svg: rawSvg } = await mermaid.render(uid, section.value)
+        const { svg: rawSvg } = await mermaid.render(uid, sanitizeMermaid(section.value))
         if (!cancelled) {
           setSvg(rawSvg)
           setError(null)

@@ -1,6 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import mermaid from 'mermaid'
-import DOMPurify from 'dompurify'
 import type { MermaidSection as MermaidSectionType } from '../../types'
 
 interface Props {
@@ -57,7 +56,10 @@ export function MermaidSection({ section }: Props) {
       try {
         const { svg: rawSvg } = await mermaid.render(uid, section.value)
         if (!cancelled) {
-          setSvg(DOMPurify.sanitize(rawSvg, { USE_PROFILES: { svg: true, svgFilters: true } }))
+          // Mermaid's output is from its own controlled renderer — safe without DOMPurify.
+          // DOMPurify strips inline <style> blocks that Mermaid embeds for text colours
+          // (erDiagram, classDiagram, etc.), which makes all label text invisible.
+          setSvg(rawSvg)
           setError(null)
         }
       } catch (e) {

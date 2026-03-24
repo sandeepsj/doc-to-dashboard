@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import mermaid from 'mermaid'
 import DOMPurify from 'dompurify'
 import type { MermaidSection as MermaidSectionType } from '../../types'
@@ -7,11 +7,39 @@ interface Props {
   section: MermaidSectionType
 }
 
+/** After inserting SVG into the DOM, expand its viewBox to include any
+ *  content (e.g. the title) that overflows the original bounds. */
+function fixSvgViewBox(container: HTMLElement) {
+  const svgEl = container.querySelector('svg') as SVGSVGElement | null
+  if (!svgEl) return
+  try {
+    const PAD = 12
+    const bbox = svgEl.getBBox()
+    svgEl.setAttribute(
+      'viewBox',
+      `${bbox.x - PAD} ${bbox.y - PAD} ${bbox.width + PAD * 2} ${bbox.height + PAD * 2}`
+    )
+    svgEl.removeAttribute('height')
+    svgEl.style.width = '100%'
+    svgEl.style.height = 'auto'
+  } catch {
+    // getBBox() can throw for off-screen / hidden elements — safe to ignore
+  }
+}
+
 export function MermaidSection({ section }: Props) {
   const rawId = useId()
   const uid = `mermaid-${rawId.replace(/:/g, '')}`
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // Fix viewBox after SVG is inserted into the DOM
+  useEffect(() => {
+    if (svg && wrapperRef.current) {
+      fixSvgViewBox(wrapperRef.current)
+    }
+  }, [svg])
 
   useEffect(() => {
     let cancelled = false
@@ -82,6 +110,7 @@ export function MermaidSection({ section }: Props) {
     >
       {svg ? (
         <div
+          ref={wrapperRef}
           className="p-4 md:p-6 flex justify-center overflow-x-auto mermaid-wrapper"
           dangerouslySetInnerHTML={{ __html: svg }}
         />

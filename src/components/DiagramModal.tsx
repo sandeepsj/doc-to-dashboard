@@ -5,8 +5,8 @@ interface Props {
   onClose: () => void
 }
 
-const MIN_ZOOM = 0.1
-const MAX_ZOOM = 10
+const MIN_ZOOM = 0.05
+const MAX_ZOOM = 20
 
 export function DiagramModal({ svg, onClose }: Props) {
   const [zoom, setZoom] = useState(1)
@@ -16,24 +16,46 @@ export function DiagramModal({ svg, onClose }: Props) {
   const dragOrigin = useRef<{ mx: number; my: number; px: number; py: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  const naturalSize = useRef<{ w: number; h: number } | null>(null)
 
-  // Fit diagram to viewport on open
+  // On mount: measure SVG natural size, fit to viewport, then scale SVG element directly
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       if (!containerRef.current || !contentRef.current) return
-      const svg = contentRef.current.querySelector('svg')
-      if (!svg) return
-      const cw = containerRef.current.clientWidth - 80
+      const svgEl = contentRef.current.querySelector('svg')
+      if (!svgEl) return
+
+      // Make SVG fully fluid so getBoundingClientRect gives the natural rendered size
+      svgEl.removeAttribute('width')
+      svgEl.removeAttribute('height')
+      svgEl.style.width = ''
+      svgEl.style.height = ''
+
+      const rect = svgEl.getBoundingClientRect()
+      const nw = rect.width || 800
+      const nh = rect.height || 600
+      naturalSize.current = { w: nw, h: nh }
+
+      const cw = containerRef.current.clientWidth  - 80
       const ch = containerRef.current.clientHeight - 80
-      const sw = svg.clientWidth || svg.getBoundingClientRect().width
-      const sh = svg.clientHeight || svg.getBoundingClientRect().height
-      if (sw > 0 && sh > 0) {
-        const fit = Math.min(cw / sw, ch / sh, 1)
-        setZoom(fit)
-      }
+      const fit = Math.min(cw / nw, ch / nh, 1)
+
+      // Apply initial fit by setting actual SVG dimensions (stays crisp at any size)
+      svgEl.style.width  = `${nw * fit}px`
+      svgEl.style.height = `${nh * fit}px`
+      setZoom(fit)
     })
     return () => cancelAnimationFrame(frame)
   }, [])
+
+  // Whenever zoom changes, update SVG dimensions directly → re-renders as vector
+  useEffect(() => {
+    if (!contentRef.current || !naturalSize.current) return
+    const svgEl = contentRef.current.querySelector('svg')
+    if (!svgEl) return
+    svgEl.style.width  = `${naturalSize.current.w * zoom}px`
+    svgEl.style.height = `${naturalSize.current.h * zoom}px`
+  }, [zoom])
 
   // Close on Escape
   useEffect(() => {
@@ -49,7 +71,7 @@ export function DiagramModal({ svg, onClose }: Props) {
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  // Zoom on scroll wheel (non-passive so we can preventDefault)
+  // Scroll-wheel zoom — non-passive so we can preventDefault
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
     const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12
@@ -86,7 +108,17 @@ export function DiagramModal({ svg, onClose }: Props) {
 
   const zoomIn  = () => setZoom(z => Math.min(MAX_ZOOM, z * 1.25))
   const zoomOut = () => setZoom(z => Math.max(MIN_ZOOM, z / 1.25))
-  const reset   = () => { setZoom(1); setPan({ x: 0, y: 0 }) }
+  const reset   = () => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+    if (contentRef.current && naturalSize.current) {
+      const svgEl = contentRef.current.querySelector('svg')
+      if (svgEl) {
+        svgEl.style.width  = `${naturalSize.current.w}px`
+        svgEl.style.height = `${naturalSize.current.h}px`
+      }
+    }
+  }
 
   return (
     <div
@@ -94,16 +126,19 @@ export function DiagramModal({ svg, onClose }: Props) {
       style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)' }}
     >
       {/* Top bar */}
-      <div className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
-        style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-
-        <div className="flex items-center gap-1 rounded-lg overflow-hidden"
-          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+      <div
+        className="flex items-center gap-2 px-4 py-3 flex-shrink-0"
+        style={{ background: 'rgba(0,0,0,0.4)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        <div
+          className="flex items-center rounded-lg overflow-hidden"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+        >
           <button
             onClick={zoomOut}
             className="px-3 py-1.5 text-sm font-mono hover:bg-white/10 transition-colors"
             style={{ color: '#e2e0ed' }}
-            title="Zoom out (scroll down)"
+            title="Zoom out"
           >−</button>
           <button
             onClick={reset}
@@ -115,7 +150,7 @@ export function DiagramModal({ svg, onClose }: Props) {
             onClick={zoomIn}
             className="px-3 py-1.5 text-sm font-mono hover:bg-white/10 transition-colors"
             style={{ color: '#e2e0ed' }}
-            title="Zoom in (scroll up)"
+            title="Zoom in"
           >+</button>
         </div>
 
@@ -135,7 +170,7 @@ export function DiagramModal({ svg, onClose }: Props) {
         </button>
       </div>
 
-      {/* Diagram canvas */}
+      {/* Canvas — only translate for pan, no scale transform */}
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden select-none"
@@ -145,16 +180,10 @@ export function DiagramModal({ svg, onClose }: Props) {
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
       >
-        <div
-          className="w-full h-full flex items-center justify-center"
-        >
+        <div className="w-full h-full flex items-center justify-center">
           <div
             ref={contentRef}
-            style={{
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: 'center center',
-              willChange: 'transform',
-            }}
+            style={{ transform: `translate(${pan.x}px, ${pan.y}px)` }}
             dangerouslySetInnerHTML={{ __html: svg }}
           />
         </div>

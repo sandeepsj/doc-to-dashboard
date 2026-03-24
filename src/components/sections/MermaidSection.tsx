@@ -1,23 +1,32 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import mermaid from 'mermaid'
+import { DiagramModal } from '../DiagramModal'
 import type { MermaidSection as MermaidSectionType } from '../../types'
 
 interface Props {
   section: MermaidSectionType
 }
 
-/** After inserting SVG into the DOM, expand its viewBox to include any
- *  content (e.g. the title) that overflows the original bounds. */
+/**
+ * Expand the SVG viewBox to include content that overflows the original bounds
+ * (e.g. a title that extends past x=0). Only applies when getBBox returns a
+ * valid bounding box larger than the current viewBox — never shrinks or zeroes it.
+ */
 function fixSvgViewBox(container: HTMLElement) {
   const svgEl = container.querySelector('svg') as SVGSVGElement | null
   if (!svgEl) return
   try {
-    const PAD = 12
+    const PAD = 16
     const bbox = svgEl.getBBox()
-    svgEl.setAttribute(
-      'viewBox',
-      `${bbox.x - PAD} ${bbox.y - PAD} ${bbox.width + PAD * 2} ${bbox.height + PAD * 2}`
-    )
+    // Skip if bbox is degenerate — indicates rendering failed or content is hidden
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
+
+    const vb = svgEl.viewBox.baseVal
+    const newX = Math.min(vb.x, bbox.x - PAD)
+    const newY = Math.min(vb.y, bbox.y - PAD)
+    const newR = Math.max(vb.x + vb.width,  bbox.x + bbox.width  + PAD)
+    const newB = Math.max(vb.y + vb.height, bbox.y + bbox.height + PAD)
+    svgEl.setAttribute('viewBox', `${newX} ${newY} ${newR - newX} ${newB - newY}`)
     svgEl.removeAttribute('height')
     svgEl.style.width = '100%'
     svgEl.style.height = 'auto'
@@ -31,6 +40,7 @@ export function MermaidSection({ section }: Props) {
   const uid = `mermaid-${rawId.replace(/:/g, '')}`
   const [svg, setSvg] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   // Fix viewBox after SVG is inserted into the DOM
@@ -56,9 +66,6 @@ export function MermaidSection({ section }: Props) {
       try {
         const { svg: rawSvg } = await mermaid.render(uid, section.value)
         if (!cancelled) {
-          // Mermaid's output is from its own controlled renderer — safe without DOMPurify.
-          // DOMPurify strips inline <style> blocks that Mermaid embeds for text colours
-          // (erDiagram, classDiagram, etc.), which makes all label text invisible.
           setSvg(rawSvg)
           setError(null)
         }
@@ -106,27 +113,51 @@ export function MermaidSection({ section }: Props) {
   }
 
   return (
-    <div
-      className="rounded-2xl overflow-hidden shadow-sm"
-      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-    >
-      {svg ? (
-        <div
-          ref={wrapperRef}
-          className="p-4 md:p-6 flex justify-center overflow-x-auto mermaid-wrapper"
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
-      ) : (
-        <div className="p-6 flex items-center justify-center" style={{ minHeight: '120px' }}>
-          <div className="flex items-center gap-2" style={{ color: 'var(--text-faint)' }}>
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <span className="text-xs">Rendering diagram…</span>
+    <>
+      <div
+        className="rounded-2xl overflow-hidden shadow-sm group relative"
+        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+      >
+        {svg ? (
+          <>
+            <div
+              ref={wrapperRef}
+              className="p-4 md:p-6 flex justify-center overflow-x-auto mermaid-wrapper"
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+            {/* Expand button — appears on hover */}
+            <button
+              onClick={() => setModalOpen(true)}
+              className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg"
+              style={{
+                background: 'var(--bg-subtle)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-muted)',
+              }}
+              title="Open fullscreen (zoom & pan)"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+              </svg>
+              Expand
+            </button>
+          </>
+        ) : (
+          <div className="p-6 flex items-center justify-center" style={{ minHeight: '120px' }}>
+            <div className="flex items-center gap-2" style={{ color: 'var(--text-faint)' }}>
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <span className="text-xs">Rendering diagram…</span>
+            </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {modalOpen && svg && (
+        <DiagramModal svg={svg} onClose={() => setModalOpen(false)} />
       )}
-    </div>
+    </>
   )
 }

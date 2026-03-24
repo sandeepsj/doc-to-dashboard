@@ -5,7 +5,8 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-family-sans: 'Inter', system-ui, sans-serif;
+  --font-family-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-family-prose: 'Lora', Georgia, serif;
   --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
   --color-violet-50:  #f5f3ff;
@@ -267,6 +268,14 @@
   }
   body {
     background-color: var(--bg-page);
+    font-family: var(--font-family-sans);
+  }
+
+  /* Prose elements use Lora for better long-form readability */
+  article p, article li, article blockquote {
+    font-family: var(--font-family-prose);
+    font-size: 1rem;
+    line-height: 1.8;
   }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }

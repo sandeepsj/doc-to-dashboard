@@ -11,6 +11,7 @@ const MAX_ZOOM = 10
 export function DiagramModal({ svg, onClose }: Props) {
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [dragging, setDragging] = useState(false)
   const isDragging = useRef(false)
   const dragOrigin = useRef<{ mx: number; my: number; px: number; py: number } | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -65,6 +66,7 @@ export function DiagramModal({ svg, onClose }: Props) {
   const onMouseDown = (e: React.MouseEvent) => {
     e.preventDefault()
     isDragging.current = true
+    setDragging(true)
     dragOrigin.current = { mx: e.clientX, my: e.clientY, px: pan.x, py: pan.y }
   }
 
@@ -78,6 +80,7 @@ export function DiagramModal({ svg, onClose }: Props) {
 
   const onMouseUp = () => {
     isDragging.current = false
+    setDragging(false)
     dragOrigin.current = null
   }
 
@@ -136,7 +139,7 @@ export function DiagramModal({ svg, onClose }: Props) {
       <div
         ref={containerRef}
         className="flex-1 overflow-hidden select-none"
-        style={{ cursor: isDragging.current ? 'grabbing' : 'grab' }}
+        style={{ cursor: dragging ? 'grabbing' : 'grab' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}

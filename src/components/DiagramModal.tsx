@@ -5,49 +5,86 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * Expand the SVG viewBox to include content that overflows the original bounds.
+ * Same logic as MermaidSection — needed here too because the SVG string from
+ * mermaid.render() may have content at negative coordinates (e.g. mindmaps).
+ */
+function fixSvgViewBox(container: HTMLElement) {
+  const svgEl = container.querySelector('svg') as SVGSVGElement | null
+  if (!svgEl) return
+  try {
+    const PAD = 16
+    const bbox = svgEl.getBBox()
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
+    const vb = svgEl.viewBox.baseVal
+    const newX = Math.min(vb.x, bbox.x - PAD)
+    const newY = Math.min(vb.y, bbox.y - PAD)
+    const newR = Math.max(vb.x + vb.width,  bbox.x + bbox.width  + PAD)
+    const newB = Math.max(vb.y + vb.height, bbox.y + bbox.height + PAD)
+    svgEl.setAttribute('viewBox', `${newX} ${newY} ${newR - newX} ${newB - newY}`)
+    svgEl.removeAttribute('height')
+    svgEl.style.width = '100%'
+    svgEl.style.height = 'auto'
+  } catch {
+    // getBBox() can throw for off-screen / hidden elements — safe to ignore
+  }
+}
+
 export function DiagramModal({ svg, onClose }: Props) {
-  const [pct, setPct] = useState(100)           // toolbar display only
+  const [pct, setPct] = useState(100)
   const [dragging, setDragging] = useState(false)
 
-  // All transform state lives in refs — never touched by React reconciliation
   const zoomRef = useRef(1)
   const panRef  = useRef({ x: 0, y: 0 })
   const dragRef = useRef<{ mx: number; my: number; px: number; py: number } | null>(null)
 
-  // Two-layer approach: outer = translate (pan), inner = zoom (via CSS zoom — vector-crisp)
-  const panLayerRef  = useRef<HTMLDivElement>(null)
-  const zoomLayerRef = useRef<HTMLDivElement>(null)
+  // Single content layer: position absolute, transform-origin 0 0
+  // transform: translate(panX, panY) scale(zoom)
+  const contentRef  = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   const initialized = useRef(false)
 
-  function commitZoom(z: number) {
-    const clamped = Math.max(0.05, Math.min(20, z))
-    zoomRef.current = clamped
-    if (zoomLayerRef.current) (zoomLayerRef.current.style as CSSStyleDeclaration & { zoom: string }).zoom = String(clamped)
-    setPct(Math.round(clamped * 100))
+  function applyTransform() {
+    if (!contentRef.current) return
+    const { x, y } = panRef.current
+    const z = zoomRef.current
+    contentRef.current.style.transform = `translate(${x}px, ${y}px) scale(${z})`
   }
 
-  function commitPan(x: number, y: number) {
-    panRef.current = { x, y }
-    if (panLayerRef.current) panLayerRef.current.style.transform = `translate(${x}px, ${y}px)`
+  function fitToView() {
+    // Allow init effect to re-run
+    initialized.current = false
+    // Trigger re-render so the effect fires
+    setPct(p => p)
   }
 
-  // Fit-to-viewport once, after first paint
+  // Fit-to-viewport + fixSvgViewBox — runs every render but short-circuits after first
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
 
-    const svgEl = zoomLayerRef.current?.querySelector('svg')
-    if (!svgEl || !containerRef.current) return
+    // Fix SVG viewBox FIRST so that bounds (including negative-coord content) are correct
+    if (contentRef.current) fixSvgViewBox(contentRef.current)
 
-    const rect  = svgEl.getBoundingClientRect()
-    const nw = rect.width  || 800
-    const nh = rect.height || 600
+    const card = contentRef.current?.firstElementChild as HTMLElement | null
+    if (!card || !containerRef.current) return
+
+    const nw = card.offsetWidth  || 800
+    const nh = card.offsetHeight || 600
     const cw = containerRef.current.clientWidth  - 80
     const ch = containerRef.current.clientHeight - 80
-    commitZoom(Math.min(cw / nw, ch / nh, 1))
-  })  // Intentionally no deps: runs every render but short-circuits after first via flag
+    const fit = Math.min(cw / nw, ch / nh, 1)
+
+    panRef.current = {
+      x: (containerRef.current.clientWidth  - nw * fit) / 2,
+      y: (containerRef.current.clientHeight - nh * fit) / 2,
+    }
+    zoomRef.current = fit
+    applyTransform()
+    setPct(Math.round(fit * 100))
+  })
 
   // Escape key
   useEffect(() => {
@@ -63,17 +100,29 @@ export function DiagramModal({ svg, onClose }: Props) {
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  // Wheel zoom
+  // Wheel zoom toward cursor
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
     const fn = (e: WheelEvent) => {
       e.preventDefault()
-      commitZoom(zoomRef.current * (e.deltaY < 0 ? 1.12 : 1 / 1.12))
+      const rect = el.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const prev = zoomRef.current
+      const next = Math.max(0.05, Math.min(50, prev * (e.deltaY < 0 ? 1.12 : 1 / 1.12)))
+      // Keep the content point under the cursor fixed after zoom
+      panRef.current = {
+        x: mx - (mx - panRef.current.x) * next / prev,
+        y: my - (my - panRef.current.y) * next / prev,
+      }
+      zoomRef.current = next
+      applyTransform()
+      setPct(Math.round(next * 100))
     }
     el.addEventListener('wheel', fn, { passive: false })
     return () => el.removeEventListener('wheel', fn)
-  }, []) // stable — reads from ref, no closures over state
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(6px)' }}>
@@ -84,14 +133,38 @@ export function DiagramModal({ svg, onClose }: Props) {
 
         <div className="flex items-center rounded-lg overflow-hidden"
           style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-          <button onClick={() => commitZoom(zoomRef.current / 1.25)}
+          <button onClick={() => {
+            const prev = zoomRef.current
+            const next = Math.max(0.05, prev / 1.25)
+            const cx = (containerRef.current?.clientWidth  ?? 0) / 2
+            const cy = (containerRef.current?.clientHeight ?? 0) / 2
+            panRef.current = {
+              x: cx - (cx - panRef.current.x) * next / prev,
+              y: cy - (cy - panRef.current.y) * next / prev,
+            }
+            zoomRef.current = next
+            applyTransform()
+            setPct(Math.round(next * 100))
+          }}
             className="px-3 py-1.5 text-sm font-mono hover:bg-white/10 transition-colors"
             style={{ color: '#e2e0ed' }}>−</button>
-          <button onClick={() => { commitZoom(1); commitPan(0, 0) }}
+          <button onClick={fitToView}
             className="px-3 py-1.5 text-xs font-mono hover:bg-white/10 transition-colors min-w-[52px] text-center"
             style={{ color: '#c4c1d8', borderLeft: '1px solid rgba(255,255,255,0.08)', borderRight: '1px solid rgba(255,255,255,0.08)' }}
-            title="Reset">{pct}%</button>
-          <button onClick={() => commitZoom(zoomRef.current * 1.25)}
+            title="Fit to screen">{pct}%</button>
+          <button onClick={() => {
+            const prev = zoomRef.current
+            const next = Math.min(50, prev * 1.25)
+            const cx = (containerRef.current?.clientWidth  ?? 0) / 2
+            const cy = (containerRef.current?.clientHeight ?? 0) / 2
+            panRef.current = {
+              x: cx - (cx - panRef.current.x) * next / prev,
+              y: cy - (cy - panRef.current.y) * next / prev,
+            }
+            zoomRef.current = next
+            applyTransform()
+            setPct(Math.round(next * 100))
+          }}
             className="px-3 py-1.5 text-sm font-mono hover:bg-white/10 transition-colors"
             style={{ color: '#e2e0ed' }}>+</button>
         </div>
@@ -109,10 +182,10 @@ export function DiagramModal({ svg, onClose }: Props) {
         </button>
       </div>
 
-      {/* Canvas */}
+      {/* Canvas — overflow-hidden clips the view, content is absolute-positioned */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-hidden select-none flex items-center justify-center"
+        className="flex-1 overflow-hidden select-none relative"
         style={{ cursor: dragging ? 'grabbing' : 'grab' }}
         onMouseDown={e => {
           e.preventDefault()
@@ -121,19 +194,22 @@ export function DiagramModal({ svg, onClose }: Props) {
         }}
         onMouseMove={e => {
           if (!dragRef.current) return
-          commitPan(
-            dragRef.current.px + e.clientX - dragRef.current.mx,
-            dragRef.current.py + e.clientY - dragRef.current.my,
-          )
+          panRef.current = {
+            x: dragRef.current.px + e.clientX - dragRef.current.mx,
+            y: dragRef.current.py + e.clientY - dragRef.current.my,
+          }
+          applyTransform()
         }}
         onMouseUp={() => { setDragging(false); dragRef.current = null }}
         onMouseLeave={() => { setDragging(false); dragRef.current = null }}
       >
-        {/* Pan layer */}
-        <div ref={panLayerRef} style={{ display: 'inline-block' }}>
-          {/* Zoom layer — CSS zoom re-renders SVG as vector at target size, no pixel upscaling */}
+        {/* Single content layer: translate + scale with origin at top-left */}
+        <div
+          ref={contentRef}
+          style={{ position: 'absolute', top: 0, left: 0, transformOrigin: '0 0' }}
+        >
+          {/* White card — sizes to SVG content after fixSvgViewBox */}
           <div
-            ref={zoomLayerRef}
             style={{
               display: 'inline-block',
               background: '#ffffff',

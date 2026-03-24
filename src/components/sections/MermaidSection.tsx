@@ -18,8 +18,20 @@ function fixSvgViewBox(container: HTMLElement) {
   try {
     const PAD = 16
     const bbox = svgEl.getBBox()
-    // Skip if bbox is degenerate — indicates rendering failed or content is hidden
-    if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
+
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+      // getBBox returns 0 for diagrams that use <foreignObject> for text (e.g. timeline).
+      // Still normalize sizing: if the SVG has a valid viewBox, let CSS control dimensions.
+      const vb = svgEl.viewBox?.baseVal
+      if (vb && vb.width > 0 && vb.height > 0) {
+        svgEl.removeAttribute('width')
+        svgEl.removeAttribute('height')
+        svgEl.style.width = '100%'
+        svgEl.style.height = 'auto'
+        svgEl.style.maxWidth = ''   // clear any Mermaid-set inline max-width
+      }
+      return
+    }
 
     const vb = svgEl.viewBox.baseVal
     const newX = Math.min(vb.x, bbox.x - PAD)
@@ -27,9 +39,11 @@ function fixSvgViewBox(container: HTMLElement) {
     const newR = Math.max(vb.x + vb.width,  bbox.x + bbox.width  + PAD)
     const newB = Math.max(vb.y + vb.height, bbox.y + bbox.height + PAD)
     svgEl.setAttribute('viewBox', `${newX} ${newY} ${newR - newX} ${newB - newY}`)
+    svgEl.removeAttribute('width')
     svgEl.removeAttribute('height')
     svgEl.style.width = '100%'
     svgEl.style.height = 'auto'
+    svgEl.style.maxWidth = ''
   } catch {
     // getBBox() can throw for off-screen / hidden elements — safe to ignore
   }

@@ -223,6 +223,14 @@
   .prose-inline del { color: var(--text-faint); text-decoration: line-through; }
 }
 
+/* ── Mermaid diagram SVG overflow fix ────────────────────────────────────── */
+@layer components {
+  .mermaid-wrapper svg {
+    overflow: visible !important;
+    max-width: 100%;
+  }
+}
+
 /* ── HTML table wrapper (passthrough HTML tables) ────────────────────────── */
 @layer components {
   .html-table-wrapper table {

@@ -82,7 +82,7 @@ export function MermaidSection({ section }: Props) {
     >
       {svg ? (
         <div
-          className="p-4 md:p-6 flex justify-center overflow-x-auto"
+          className="p-4 md:p-6 flex justify-center overflow-x-auto mermaid-wrapper"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (

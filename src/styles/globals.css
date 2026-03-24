@@ -1,5 +1,6 @@
 @import 'tailwindcss';
 @import 'highlight.js/styles/github-dark.css';
+@import 'katex/dist/katex.min.css';
 
 @variant dark (&:where(.dark, .dark *));
 
@@ -220,6 +221,33 @@
   .prose-inline strong { font-weight: 700; color: var(--text-heading); }
   .prose-inline em { font-style: italic; color: var(--text-secondary); }
   .prose-inline del { color: var(--text-faint); text-decoration: line-through; }
+}
+
+/* ── HTML table wrapper (passthrough HTML tables) ────────────────────────── */
+@layer components {
+  .html-table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .html-table-wrapper th,
+  .html-table-wrapper td {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border-row);
+    color: var(--text-primary);
+    vertical-align: top;
+  }
+  .html-table-wrapper th {
+    background: var(--bg-subtle);
+    font-weight: 600;
+    color: var(--text-heading);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .html-table-wrapper tr:nth-child(even) td { background: var(--table-row-even); }
+  .html-table-wrapper tr:nth-child(odd) td  { background: var(--table-row-odd); }
+  .html-table-wrapper tr:hover td           { background: var(--table-row-hover); }
 }
 
 /* ── Base ─────────────────────────────────────────────────────────────────── */

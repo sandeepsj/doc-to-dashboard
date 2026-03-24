@@ -8,6 +8,13 @@ import {
   BlockquoteSection,
   ImageSection,
   ParagraphSection,
+  MermaidSection,
+  FrontmatterSection,
+  MathSection,
+  FootnotesSection,
+  HtmlSection,
+  GlossarySection,
+  PlaceholderSection,
 } from './sections'
 
 const fadeUp = {
@@ -62,6 +69,20 @@ function renderSection(section: DashboardSection) {
       return <ParagraphSection section={section} />
     case 'hr':
       return <hr className="border-t my-2" style={{ borderColor: 'var(--border)' }} />
+    case 'mermaid':
+      return <MermaidSection section={section} />
+    case 'frontmatter':
+      return <FrontmatterSection section={section} />
+    case 'math':
+      return <MathSection section={section} />
+    case 'footnotes':
+      return <FootnotesSection section={section} />
+    case 'html':
+      return <HtmlSection section={section} />
+    case 'glossary':
+      return <GlossarySection section={section} />
+    case 'placeholder':
+      return <PlaceholderSection section={section} />
     default:
       return null
   }

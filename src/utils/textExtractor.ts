@@ -49,6 +49,29 @@ export function extractReadableSegments(sections: DashboardSection[]): ReadableS
       case 'image':
         text = section.alt ? `Image: ${section.alt}` : ''
         break
+      case 'mermaid':
+        text = `Diagram: ${section.lang} diagram.`
+        break
+      case 'frontmatter':
+        text = `Document metadata: ${Object.entries(section.data)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('. ')}.`
+        break
+      case 'math':
+        text = `Mathematical formula: ${section.value}`
+        break
+      case 'footnotes':
+        text = `Footnotes: ${section.items.map((f) => `${f.id}: ${stripHtml(f.html)}`).join('. ')}`
+        break
+      case 'html':
+        text = stripHtml(section.value)
+        break
+      case 'glossary':
+        text = section.entries.map((e) => `${e.term}: ${stripHtml(e.definition)}`).join('. ')
+        break
+      case 'placeholder':
+        text = `${section.label} not rendered.`
+        break
       case 'hr':
         return
     }

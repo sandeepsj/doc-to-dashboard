@@ -59,6 +59,46 @@ export interface HorizontalRuleSection {
   type: 'hr'
 }
 
+export interface MermaidSection {
+  type: 'mermaid'
+  lang: string
+  value: string
+}
+
+export interface FrontmatterSection {
+  type: 'frontmatter'
+  data: Record<string, unknown>
+  raw: string
+}
+
+export interface MathSection {
+  type: 'math'
+  value: string
+  display: true
+}
+
+export interface FootnotesSection {
+  type: 'footnotes'
+  items: { id: string; html: string }[]
+}
+
+export interface HtmlSection {
+  type: 'html'
+  value: string
+  isTable: boolean
+}
+
+export interface GlossarySection {
+  type: 'glossary'
+  entries: { term: string; definition: string }[]
+}
+
+export interface PlaceholderSection {
+  type: 'placeholder'
+  label: string
+  raw: string
+}
+
 export type DashboardSection =
   | HeadingSection
   | TableSection
@@ -68,6 +108,13 @@ export type DashboardSection =
   | ImageSection
   | ParagraphSection
   | HorizontalRuleSection
+  | MermaidSection
+  | FrontmatterSection
+  | MathSection
+  | FootnotesSection
+  | HtmlSection
+  | GlossarySection
+  | PlaceholderSection
 
 export interface ParsedDocument {
   id: string

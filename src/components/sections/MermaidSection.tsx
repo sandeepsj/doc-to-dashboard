@@ -102,7 +102,12 @@ export function MermaidSection({ section }: Props) {
       })
 
       try {
-        const { svg: rawSvg } = await mermaid.render(uid, sanitizeMermaid(section.value))
+        // When the code block lang IS the diagram type (e.g. ```xychart-beta),
+        // section.value lacks the type as its first line — mermaid.render() needs it.
+        const source = section.lang === 'mermaid'
+          ? section.value
+          : `${section.lang}\n${section.value}`
+        const { svg: rawSvg } = await mermaid.render(uid, sanitizeMermaid(source))
         if (!cancelled) {
           setSvg(rawSvg)
           setError(null)

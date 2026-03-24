@@ -14,11 +14,12 @@ interface Props {
   activeDocId: string
   onChangeActiveDoc: (id: string) => void
   onAddFiles: () => void
+  onGoHome?: () => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
 }
 
-export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFiles, theme, onToggleTheme }: Props) {
+export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFiles, onGoHome, theme, onToggleTheme }: Props) {
   const activeDoc = documents.find((d) => d.id === activeDocId)!
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -106,6 +107,22 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
           className="h-12 flex items-center px-4 md:px-6 flex-shrink-0 backdrop-blur-sm"
           style={{ background: 'var(--header-bg)', borderBottom: '1px solid var(--header-border)' }}
         >
+          {/* Home — shown when loaded from project library */}
+          {onGoHome && (
+            <button
+              onClick={onGoHome}
+              className="mr-1 w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ color: 'var(--text-muted)' }}
+              title="Back to projects"
+              aria-label="Back to projects"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            </button>
+          )}
+
           {/* Hamburger */}
           <button
             className="xl:hidden mr-3 w-8 h-8 flex items-center justify-center rounded-lg transition-colors"

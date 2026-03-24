@@ -172,7 +172,7 @@ export function Dashboard({ documents, activeDocId, onChangeActiveDoc, onAddFile
         {/* Scrollable content */}
         <div ref={mainRef} className="flex-1 overflow-y-auto bg-canvas">
           <div className="xl:pr-56">
-            <article className="max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-10 space-y-4 md:space-y-5">
+            <article className="max-w-3xl xl:max-w-4xl 2xl:max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-10 space-y-5 md:space-y-6">
               {activeDoc.sections.map((section, i) => (
                 <SectionRenderer
                   key={i}

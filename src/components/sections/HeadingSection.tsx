@@ -24,8 +24,9 @@ export function HeadingSection({ section }: Props) {
   if (section.depth === 2) {
     return (
       <Tag id={section.id} className="scroll-mt-20 mt-5 md:mt-7 mb-2 md:mb-3 group">
-        <a href={`#${section.id}`} className="no-underline inline-flex items-baseline gap-2 flex-wrap">
-          <span className="font-mono text-xs font-bold" style={{ color: '#8b5cf6' }}>H2</span>
+        <a href={`#${section.id}`} className="no-underline inline-flex items-center gap-2 flex-wrap">
+          <span className="w-2 h-2 rounded-sm flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #8b5cf6, #d946ef)' }} />
           <span className="text-lg sm:text-xl font-semibold" style={{ color: 'var(--text-heading)' }}>{section.text}</span>
           <span className="opacity-0 group-hover:opacity-40 text-sm transition-opacity" style={{ color: 'var(--text-muted)' }}>#</span>
         </a>

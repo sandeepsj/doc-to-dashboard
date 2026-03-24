@@ -315,10 +315,14 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         })
         .join('<br />')
 
+      const variant = detectVariant(rawText.replace(/<[^>]+>/g, ''))
+      // Strip the [!KEYWORD] marker from the content so it doesn't appear twice
+      const content = rawText.replace(/^\[!(NOTE|WARNING|TIP|IMPORTANT|CAUTION)\]\s*/i, '')
+
       sections.push({
         type: 'blockquote',
-        variant: detectVariant(rawText.replace(/<[^>]+>/g, '')),
-        content: rawText,
+        variant,
+        content,
       } satisfies BlockquoteSection)
       continue
     }

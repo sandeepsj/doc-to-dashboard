@@ -1,6 +1,23 @@
 {
   "projects": [
     {
+      "id": "indian-philosophy-vedanta-kanada_20260325",
+      "name": "Indian Philosophy — Overview",
+      "description": "Imagine you're a software engineer and someone asks: \"What is the operating system that runs all of existence?\" That's the opening question of Indian philosophy",
+      "fileCount": 9,
+      "files": [
+        "00_overview.md",
+        "01_deep_dive.md",
+        "02_mindmap.md",
+        "03_timeline.md",
+        "04_comparisons.md",
+        "05_relationships.md",
+        "06_glossary.md",
+        "07_key_facts.md",
+        "99_sources.md"
+      ]
+    },
+    {
       "id": "teacher-qualifications-inclusive-india-preschools_20260324",
       "name": "Teacher Qualifications, Training & Compensation in India Preschools — Overview",
       "description": "India's Early Childhood Care and Education ECCE sector spans 1.35 million Anganwadi Centers AWCs serving approximately 80 million children under age 6, making i",

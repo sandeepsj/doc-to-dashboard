@@ -50,6 +50,21 @@ function fixSvgViewBox(container: HTMLElement) {
 }
 
 /**
+ * Map normalized (lowercase) lang identifiers to the canonical Mermaid type
+ * names that the Mermaid lexer requires as the first line of source.
+ * Keys must match the lowercase values stored in section.lang by the parser.
+ */
+const MERMAID_CANONICAL: Record<string, string> = {
+  quadrantchart:    'quadrantChart',
+  sequencediagram:  'sequenceDiagram',
+  classdiagram:     'classDiagram',
+  erdiagram:        'erDiagram',
+  statediagram:     'stateDiagram',
+  'statediagram-v2': 'stateDiagram-v2',
+  gitgraph:         'gitGraph',
+}
+
+/**
  * Fix known Mermaid syntax limitations before rendering.
  * - quadrantChart: strip parentheses from point labels (lexer rejects them)
  */
@@ -104,9 +119,11 @@ export function MermaidSection({ section }: Props) {
       try {
         // When the code block lang IS the diagram type (e.g. ```xychart-beta),
         // section.value lacks the type as its first line — mermaid.render() needs it.
+        // Use the canonical (properly-cased) name because the parser lowercases lang.
+        const canonicalLang = MERMAID_CANONICAL[section.lang] ?? section.lang
         const source = section.lang === 'mermaid'
           ? section.value
-          : `${section.lang}\n${section.value}`
+          : `${canonicalLang}\n${section.value}`
         const { svg: rawSvg } = await mermaid.render(uid, sanitizeMermaid(source))
         if (!cancelled) {
           setSvg(rawSvg)

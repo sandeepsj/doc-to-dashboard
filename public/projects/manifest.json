@@ -18,6 +18,46 @@
       ]
     },
     {
+      "id": "kafka",
+      "name": "Kafka",
+      "description": "A hands-on tutorial that takes you from \"what is Kafka?\" to confidently understanding distributed event streaming — in under an hour of reading.",
+      "fileCount": 13,
+      "files": [
+        "00-index.md",
+        "01-what-and-why.md",
+        "02-thinking-in-events.md",
+        "03-topics-and-messages.md",
+        "04-partitions.md",
+        "05-brokers-and-clusters.md",
+        "06-producers.md",
+        "07-consumers.md",
+        "08-consumer-groups.md",
+        "09-setup-with-docker.md",
+        "10-hands-on.md",
+        "11-real-world-patterns.md",
+        "12-whats-next.md"
+      ]
+    },
+    {
+      "id": "rust-beginner-to-advanced_20260325",
+      "name": "Rust — What Is It and Why Should You Learn It?",
+      "description": "You've probably written Python scripts, built Java services, or dabbled in C++. Each of those languages made a trade-off: Python traded speed for simplicity, Ja",
+      "fileCount": 11,
+      "files": [
+        "00_overview.md",
+        "01_getting-started.md",
+        "02_core-concepts.md",
+        "03_ownership.md",
+        "04_borrowing-references.md",
+        "05_lifetimes.md",
+        "06_structs-enums-patterns.md",
+        "07_traits-generics.md",
+        "08_error-handling.md",
+        "09_advanced-patterns.md",
+        "99_sources.md"
+      ]
+    },
+    {
       "id": "teacher-qualifications-inclusive-india-preschools_20260324",
       "name": "Teacher Qualifications, Training & Compensation in India Preschools — Overview",
       "description": "India's Early Childhood Care and Education ECCE sector spans 1.35 million Anganwadi Centers AWCs serving approximately 80 million children under age 6, making i",

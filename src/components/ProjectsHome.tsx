@@ -53,9 +53,15 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
   const onDrop = useCallback(
     (accepted: File[]) => {
       const mdFiles = accepted.filter((f) => f.name.endsWith('.md'))
-      if (mdFiles.length > 0) onFiles(mdFiles)
+      if (mdFiles.length === 0) return
+      if (auth.isLoggedIn && onDriveUpload) {
+        const projectName = mdFiles[0].name.replace(/\.md$/i, '')
+        onDriveUpload(mdFiles, projectName)
+      } else {
+        onFiles(mdFiles)
+      }
     },
-    [onFiles]
+    [onFiles, onDriveUpload, auth.isLoggedIn]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

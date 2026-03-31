@@ -5,6 +5,8 @@ let tokenClient: google.accounts.oauth2.TokenClient | null = null
 let accessToken: string | null = null
 let gisLoaded = false
 
+const SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
+
 // Extend window for GIS types
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -16,6 +18,7 @@ declare global {
       access_token: string
       expires_in: number
       error?: string
+      error_description?: string
     }
     function initTokenClient(config: {
       client_id: string
@@ -58,10 +61,10 @@ export async function signIn(): Promise<AuthState> {
   return new Promise((resolve, reject) => {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: SCOPES,
       callback: async (response) => {
         if (response.error) {
-          reject(new Error(response.error))
+          reject(new Error(`${response.error}: ${response.error_description || ''}`))
           return
         }
         accessToken = response.access_token
@@ -82,7 +85,7 @@ export async function signIn(): Promise<AuthState> {
 
 export function signOut(): void {
   if (accessToken) {
-    google.accounts.oauth2.revoke(accessToken)
+    try { google.accounts.oauth2.revoke(accessToken) } catch { /* ignore */ }
   }
   accessToken = null
   tokenClient = null
@@ -93,17 +96,16 @@ export function getAccessToken(): string | null {
 }
 
 export async function refreshToken(): Promise<string> {
-  if (!tokenClient) throw new Error('Not signed in')
-  return new Promise((resolve, reject) => {
-    tokenClient!.requestAccessToken({ prompt: '' })
-    // The callback from initTokenClient will fire with the new token
-    // We need to intercept it — reinit with a new callback
-    const clientId = getClientId()
-    if (!clientId) { reject(new Error('No client ID')); return }
+  const clientId = getClientId()
+  if (!clientId) throw new Error('No client ID')
 
+  await loadGisScript()
+
+  return new Promise((resolve, reject) => {
+    // Re-init client with a fresh callback before requesting
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: clientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: SCOPES,
       callback: (response) => {
         if (response.error) { reject(new Error(response.error)); return }
         accessToken = response.access_token
@@ -119,11 +121,14 @@ async function fetchUserInfo(token: string): Promise<GoogleUser> {
   const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (!res.ok) throw new Error('Failed to fetch user info')
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`Failed to fetch user info (${res.status}): ${text}`)
+  }
   const data = await res.json()
   return {
     email: data.email,
-    name: data.name,
-    picture: data.picture,
+    name: data.name || data.email,
+    picture: data.picture || '',
   }
 }

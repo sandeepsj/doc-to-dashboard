@@ -3,6 +3,7 @@ import { ProjectsHome } from './components/ProjectsHome'
 import { Dashboard } from './components/Dashboard'
 import { parseMarkdown } from './parsers/markdownParser'
 import { useTheme } from './hooks/useTheme'
+import { AuthProvider, useAuthContext } from './contexts/AuthContext'
 import type { ParsedDocument } from './types'
 
 interface ProjectMeta {
@@ -10,20 +11,26 @@ interface ProjectMeta {
   files: string[]
 }
 
-function getHashProject(): string | null {
+function getHashProject(): { type: 'local' | 'drive'; id: string } | null {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-  return params.get('p')
+  const local = params.get('p')
+  if (local) return { type: 'local', id: local }
+  const drive = params.get('drive')
+  if (drive) return { type: 'drive', id: drive }
+  return null
 }
 
-export default function App() {
+function AppInner() {
   const { theme, toggle } = useTheme()
+  const { auth, storage } = useAuthContext()
   const [documents, setDocuments] = useState<ParsedDocument[]>([])
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
   const [loadingProject, setLoadingProject] = useState(false)
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Load a project by fetching its .md files and parsing them
-  const loadProject = useCallback(async (projectId: string, files: string[]) => {
+  // Load a local project by fetching its .md files
+  const loadLocalProject = useCallback(async (projectId: string, files: string[]) => {
     setLoadingProject(true)
     try {
       const fetched = await Promise.all(
@@ -35,6 +42,7 @@ export default function App() {
       )
       setDocuments(fetched)
       setActiveDocId(fetched[0]?.id ?? null)
+      setActiveProjectId(null)
     } catch (e) {
       console.error('Failed to load project', e)
     } finally {
@@ -42,40 +50,74 @@ export default function App() {
     }
   }, [])
 
-  // Called when user clicks a project card — sets hash, which triggers loadProject
-  const handleOpenProject = useCallback((projectId: string, files: string[]) => {
-    window.location.hash = `p=${projectId}`
-    loadProject(projectId, files)
-  }, [loadProject])
+  // Load a Drive project
+  const loadDriveProject = useCallback(async (folderId: string, files: string[]) => {
+    setLoadingProject(true)
+    try {
+      const fetched = await Promise.all(
+        files.map(async (f) => {
+          const content = await storage.loadDocument(folderId, f)
+          return parseMarkdown(content, f)
+        })
+      )
+      setDocuments(fetched)
+      setActiveDocId(fetched[0]?.id ?? null)
+      setActiveProjectId(folderId)
+    } catch (e) {
+      console.error('Failed to load Drive project', e)
+    } finally {
+      setLoadingProject(false)
+    }
+  }, [storage])
+
+  // Open a project (local or Drive)
+  const handleOpenProject = useCallback((projectId: string, files: string[], isDrive?: boolean) => {
+    if (isDrive) {
+      window.location.hash = `drive=${projectId}`
+      loadDriveProject(projectId, files)
+    } else {
+      window.location.hash = `p=${projectId}`
+      loadLocalProject(projectId, files)
+    }
+  }, [loadLocalProject, loadDriveProject])
 
   // Handle hash changes (back/forward, direct URL)
   useEffect(() => {
     async function handleHash() {
-      const pid = getHashProject()
-      if (!pid) {
+      const hash = getHashProject()
+      if (!hash) {
         setDocuments([])
         setActiveDocId(null)
+        setActiveProjectId(null)
         return
       }
-      // Fetch manifest to resolve file list (needed when navigating via URL directly)
-      try {
-        const res = await fetch('./projects/manifest.json')
-        const data = await res.json()
-        const project: ProjectMeta | undefined = data.projects?.find((p: ProjectMeta) => p.id === pid)
-        if (project) await loadProject(pid, project.files)
-      } catch (e) {
-        console.error('Failed to load project from hash', e)
+      if (hash.type === 'local') {
+        try {
+          const res = await fetch('./projects/manifest.json')
+          const data = await res.json()
+          const project: ProjectMeta | undefined = data.projects?.find((p: ProjectMeta) => p.id === hash.id)
+          if (project) await loadLocalProject(hash.id, project.files)
+        } catch (e) {
+          console.error('Failed to load project from hash', e)
+        }
+      } else if (hash.type === 'drive' && auth.isLoggedIn) {
+        try {
+          const projects = await storage.listProjects()
+          const project = projects.find((p) => p.id === hash.id)
+          if (project) await loadDriveProject(hash.id, project.files)
+        } catch (e) {
+          console.error('Failed to load Drive project from hash', e)
+        }
       }
     }
 
     window.addEventListener('hashchange', handleHash)
-    handleHash() // run on mount (handles direct URL access)
+    handleHash()
     return () => window.removeEventListener('hashchange', handleHash)
-  }, [loadProject])
+  }, [loadLocalProject, loadDriveProject, auth.isLoggedIn, storage])
 
   // Ad-hoc file upload
   const handleFiles = useCallback(async (files: File[]) => {
-    // Clear any project hash when uploading ad-hoc files
     if (window.location.hash) window.location.hash = ''
     const newDocs: ParsedDocument[] = []
     for (const file of files) {
@@ -87,7 +129,34 @@ export default function App() {
       return [...prev.filter((d) => !names.has(d.name)), ...newDocs]
     })
     setActiveDocId((prev) => prev ?? newDocs[0]?.id ?? null)
+    setActiveProjectId(null)
   }, [])
+
+  // Upload to Drive
+  const handleDriveUpload = useCallback(async (files: File[], projectName: string) => {
+    if (!auth.isLoggedIn) return
+    setLoadingProject(true)
+    try {
+      // Import dynamically to avoid circular deps
+      const { DriveStorageProvider } = await import('./backends/driveStorageProvider')
+      const driveProvider = new DriveStorageProvider(auth.accessToken!)
+      const folderId = await driveProvider.createProject(projectName)
+
+      for (const file of files) {
+        const content = await file.text()
+        await storage.saveDocument(folderId, file.name, content)
+      }
+
+      // Reload as Drive project
+      const fileNames = files.map((f) => f.name)
+      window.location.hash = `drive=${folderId}`
+      await loadDriveProject(folderId, fileNames)
+    } catch (e) {
+      console.error('Failed to upload to Drive', e)
+    } finally {
+      setLoadingProject(false)
+    }
+  }, [auth, storage, loadDriveProject])
 
   function handleAddFiles() {
     fileInputRef.current?.click()
@@ -103,6 +172,7 @@ export default function App() {
     window.location.hash = ''
     setDocuments([])
     setActiveDocId(null)
+    setActiveProjectId(null)
   }
 
   if (documents.length === 0 || activeDocId === null) {
@@ -110,6 +180,7 @@ export default function App() {
       <ProjectsHome
         onOpenProject={handleOpenProject}
         onFiles={handleFiles}
+        onDriveUpload={handleDriveUpload}
         theme={theme}
         onToggleTheme={toggle}
         loading={loadingProject}
@@ -130,6 +201,7 @@ export default function App() {
       <Dashboard
         documents={documents}
         activeDocId={activeDocId}
+        activeProjectId={activeProjectId}
         onChangeActiveDoc={setActiveDocId}
         onAddFiles={handleAddFiles}
         onGoHome={handleGoHome}
@@ -137,5 +209,13 @@ export default function App() {
         onToggleTheme={toggle}
       />
     </>
+  )
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
   )
 }

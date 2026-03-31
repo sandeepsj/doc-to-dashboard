@@ -6,4 +6,9 @@ export default defineConfig({
   // Absolute base so dynamic imports (Mermaid lazy chunks) always resolve
   // correctly on GitHub Pages, regardless of browser cache state.
   base: '/doc-to-dashboard/',
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/test/setup.ts'],
+  },
 })

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { ThemeToggle } from './ThemeToggle'
+import { GoogleSignIn } from './GoogleSignIn'
+import { useAuthContext } from '../contexts/AuthContext'
+import type { ProjectInfo } from '../backends/storageProvider'
 
 interface ProjectMeta {
   id: string
@@ -11,16 +14,20 @@ interface ProjectMeta {
 }
 
 interface Props {
-  onOpenProject: (id: string, files: string[]) => void
+  onOpenProject: (id: string, files: string[], isDrive?: boolean) => void
   onFiles: (files: File[]) => void
+  onDriveUpload?: (files: File[], projectName: string) => void
   theme: 'light' | 'dark'
   onToggleTheme: () => void
   loading?: boolean
 }
 
-export function ProjectsHome({ onOpenProject, onFiles, theme, onToggleTheme, loading }: Props) {
+export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onToggleTheme, loading }: Props) {
+  const { auth, storage } = useAuthContext()
   const [projects, setProjects] = useState<ProjectMeta[]>([])
+  const [driveProjects, setDriveProjects] = useState<ProjectInfo[]>([])
   const [manifestLoading, setManifestLoading] = useState(true)
+  const [driveLoading, setDriveLoading] = useState(false)
 
   useEffect(() => {
     fetch('./projects/manifest.json')
@@ -29,6 +36,19 @@ export function ProjectsHome({ onOpenProject, onFiles, theme, onToggleTheme, loa
       .catch(() => setProjects([]))
       .finally(() => setManifestLoading(false))
   }, [])
+
+  // Load Drive projects when logged in
+  useEffect(() => {
+    if (!auth.isLoggedIn) {
+      setDriveProjects([])
+      return
+    }
+    setDriveLoading(true)
+    storage.listProjects()
+      .then((projects) => setDriveProjects(projects))
+      .catch(() => setDriveProjects([]))
+      .finally(() => setDriveLoading(false))
+  }, [auth.isLoggedIn, storage])
 
   const onDrop = useCallback(
     (accepted: File[]) => {
@@ -46,8 +66,9 @@ export function ProjectsHome({ onOpenProject, onFiles, theme, onToggleTheme, loa
 
   return (
     <div className="min-h-[100dvh] bg-mesh flex flex-col items-center px-6 py-16 sm:py-20 relative">
-      {/* Theme toggle */}
-      <div className="absolute top-5 right-5">
+      {/* Top-right controls */}
+      <div className="absolute top-5 right-5 flex items-center gap-3">
+        <GoogleSignIn />
         <ThemeToggle theme={theme} onToggle={onToggleTheme} />
       </div>
 
@@ -78,7 +99,59 @@ export function ProjectsHome({ onOpenProject, onFiles, theme, onToggleTheme, loa
           </p>
         </div>
 
-        {/* Project grid */}
+        {/* Drive projects */}
+        {auth.isLoggedIn && (driveLoading ? (
+          <div className="flex items-center justify-center py-8 mb-8">
+            <svg className="animate-spin h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : driveProjects.length > 0 ? (
+          <div className="mb-14">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-500 mb-5 px-1 flex items-center gap-2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-violet-400">
+                <path d="M22 12H16L14 15H10L8 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+              </svg>
+              Your Drive Projects
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {driveProjects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onOpenProject(p.id, p.files, true)}
+                  disabled={loading}
+                  className="group text-left rounded-2xl p-6 transition-all duration-200 border border-violet-700/40 bg-violet-900/20 hover:bg-violet-800/30 hover:border-violet-600/60 hover:shadow-[0_0_40px_rgba(124,58,237,0.18)] disabled:opacity-50 backdrop-blur-sm"
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(59,130,246,0.3))', border: '1px solid rgba(124,58,237,0.45)' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 12H16L14 15H10L8 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                      </svg>
+                    </div>
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-violet-300 bg-violet-800/40 border border-violet-700/50">
+                      {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
+                    </span>
+                  </div>
+                  <div className="font-semibold text-white text-[15px] leading-snug mb-2.5 group-hover:text-violet-200 transition-colors">
+                    {p.name}
+                  </div>
+                  <div className="mt-3 flex items-center gap-1 text-xs text-violet-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    Open project
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null)}
+
+        {/* Local project grid */}
         {manifestLoading ? (
           <div className="flex items-center justify-center py-16">
             <svg className="animate-spin h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none">
@@ -89,7 +162,7 @@ export function ProjectsHome({ onOpenProject, onFiles, theme, onToggleTheme, loa
         ) : projects.length > 0 ? (
           <div className="mb-14">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-500 mb-5 px-1">
-              Projects
+              {auth.isLoggedIn ? 'Example Projects' : 'Projects'}
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {projects.map((p) => (

@@ -14,14 +14,7 @@ export function TableOfContents({ headings, activeHeadingId }: Props) {
   if (headings.length === 0) return null
 
   return (
-    <aside
-      className="hidden xl:flex flex-col fixed top-12 right-0 bottom-0 w-56 py-8 px-5 overflow-y-auto z-10"
-      style={{
-        background: 'var(--toc-bg)',
-        borderLeft: '1px solid var(--toc-border)',
-        backdropFilter: 'blur(8px)',
-      }}
-    >
+    <div className="flex-1 overflow-y-auto py-8 px-5">
       <p className="text-[10px] font-bold uppercase tracking-widest mb-4" style={{ color: 'var(--text-faint)' }}>
         On this page
       </p>
@@ -71,6 +64,6 @@ export function TableOfContents({ headings, activeHeadingId }: Props) {
           )
         })}
       </nav>
-    </aside>
+    </div>
   )
 }

@@ -39,6 +39,26 @@
       ]
     },
     {
+      "id": "rust-basics",
+      "name": "Rust Basics",
+      "description": "Learn the fundamentals of Rust — a fast, safe, and modern systems programming language. By the end of this tutorial, you'll understand Rust's ownership model, w",
+      "fileCount": 12,
+      "files": [
+        "00-index.md",
+        "01-getting-started.md",
+        "02-variables-and-types.md",
+        "03-functions-and-control-flow.md",
+        "04-ownership.md",
+        "05-borrowing-and-references.md",
+        "06-structs-and-methods.md",
+        "07-enums-and-pattern-matching.md",
+        "08-error-handling.md",
+        "09-collections.md",
+        "10-traits-and-generics.md",
+        "99-whats-next.md"
+      ]
+    },
+    {
       "id": "rust-beginner-to-advanced_20260325",
       "name": "Rust — What Is It and Why Should You Learn It?",
       "description": "You've probably written Python scripts, built Java services, or dabbled in C++. Each of those languages made a trade-off: Python traded speed for simplicity, Ja",

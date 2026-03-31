@@ -106,6 +106,12 @@
   /* Image */
   --img-bg:         #f8f7fc;
   --img-caption-bg: #f0eff7;
+
+  /* Comments */
+  --comment-indicator: #f59e0b;
+  --comment-bg:        rgba(245, 158, 11, 0.06);
+  --comment-badge-bg:  #f59e0b;
+  --comment-badge-text:#ffffff;
 }
 
 .dark {
@@ -171,6 +177,12 @@
   /* Image */
   --img-bg:         #13111f;
   --img-caption-bg: #1c1830;
+
+  /* Comments */
+  --comment-indicator: #fbbf24;
+  --comment-bg:        rgba(251, 191, 36, 0.08);
+  --comment-badge-bg:  #fbbf24;
+  --comment-badge-text:#0c0a14;
 }
 
 /* ── Utilities ────────────────────────────────────────────────────────────── */

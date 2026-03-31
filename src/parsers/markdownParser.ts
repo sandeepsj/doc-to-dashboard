@@ -145,11 +145,13 @@ function parseListItems(
 
 // ── footnote pre-pass ──────────────────────────────────────────────────────
 
-function collectFootnotes(nodes: Node[]): Map<string, string> {
+function collectFootnotes(nodes: Node[]): { map: Map<string, string>; firstLine: number } {
   const map = new Map<string, string>()
+  let firstLine = 0
   for (const node of nodes) {
     if (node.type === 'footnoteDefinition') {
       const fd = node as import('mdast').FootnoteDefinition
+      if (firstLine === 0) firstLine = node.position?.start.line ?? 0
       const html = fd.children
         .map((c) => c.type === 'paragraph'
           ? phrasingToHtml(c.children as PhrasingContent[])
@@ -158,7 +160,7 @@ function collectFootnotes(nodes: Node[]): Map<string, string> {
       map.set(fd.identifier, html)
     }
   }
-  return map
+  return { map, firstLine }
 }
 
 // ── glossary detection ─────────────────────────────────────────────────────
@@ -181,25 +183,29 @@ function tryExtractGlossaryEntry(
 
 // ── main walker ────────────────────────────────────────────────────────────
 
-function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSection[] {
+function walkNodes(nodes: Node[], footnoteMap: Map<string, string>, firstFootnoteLine: number): DashboardSection[] {
   const sections: DashboardSection[] = []
   let glossaryBuffer: { term: string; definition: string }[] = []
+  let glossaryStartLine = 0
 
   function flushGlossary() {
     if (glossaryBuffer.length > 0) {
-      sections.push({ type: 'glossary', entries: glossaryBuffer } satisfies GlossarySection)
+      sections.push({ type: 'glossary', entries: glossaryBuffer, lineStart: glossaryStartLine } satisfies GlossarySection)
       glossaryBuffer = []
+      glossaryStartLine = 0
     }
   }
 
   for (const node of nodes) {
+    const line = node.position?.start.line ?? 0
+
     if (node.type === 'yaml') {
       flushGlossary()
       try {
         const yamlNode = node as unknown as { value: string }
         const parsed = yamlLoad(yamlNode.value) as Record<string, unknown>
         if (parsed && typeof parsed === 'object') {
-          sections.push({ type: 'frontmatter', data: parsed, raw: yamlNode.value } satisfies FrontmatterSection)
+          sections.push({ type: 'frontmatter', data: parsed, raw: yamlNode.value, lineStart: line } satisfies FrontmatterSection)
         }
       } catch { /* skip malformed YAML */ }
       continue
@@ -217,6 +223,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         id: slugify(text),
         depth,
         text,
+        lineStart: line,
       } satisfies HeadingSection)
       continue
     }
@@ -241,6 +248,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         headers,
         aligns: headers.map((_, i) => aligns[i] ?? null),
         rows,
+        lineStart: line,
       } satisfies TableSection)
       continue
     }
@@ -251,14 +259,14 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
       const normLang = (c.lang ?? '').toLowerCase().trim()
 
       if (MERMAID_LANGS.has(normLang)) {
-        sections.push({ type: 'mermaid', lang: normLang, value: c.value } satisfies MermaidSection)
+        sections.push({ type: 'mermaid', lang: normLang, value: c.value, lineStart: line } satisfies MermaidSection)
         continue
       }
       if (PLACEHOLDER_LANGS.has(normLang)) {
         const label = normLang === 'plantuml' ? 'PlantUML diagram'
           : normLang === 'dot' || normLang === 'graphviz' ? 'GraphViz diagram'
           : `${normLang} diagram`
-        sections.push({ type: 'placeholder', label, raw: c.value } satisfies PlaceholderSection)
+        sections.push({ type: 'placeholder', label, raw: c.value, lineStart: line } satisfies PlaceholderSection)
         continue
       }
 
@@ -266,6 +274,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         type: 'code',
         lang: c.lang ?? null,
         value: c.value,
+        lineStart: line,
       } satisfies CodeSection)
       continue
     }
@@ -276,6 +285,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         type: 'math',
         value: (node as unknown as { value: string }).value,
         display: true,
+        lineStart: line,
       } satisfies MathSection)
       continue
     }
@@ -287,7 +297,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         ALLOWED_ATTR: ['colspan', 'rowspan', 'scope', 'class', 'style', 'align', 'href', 'target', 'rel'],
       })
       if (clean.trim()) {
-        sections.push({ type: 'html', value: clean, isTable: /<table/i.test(clean) } satisfies HtmlSection)
+        sections.push({ type: 'html', value: clean, isTable: /<table/i.test(clean), lineStart: line } satisfies HtmlSection)
       }
       continue
     }
@@ -299,6 +309,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         type: 'list',
         ordered: l.ordered ?? false,
         items: parseListItems(l.children),
+        lineStart: line,
       } satisfies ListSection)
       continue
     }
@@ -323,6 +334,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
         type: 'blockquote',
         variant,
         content,
+        lineStart: line,
       } satisfies BlockquoteSection)
       continue
     }
@@ -338,6 +350,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
           url: img.url,
           alt: img.alt ?? '',
           title: img.title ?? null,
+          lineStart: line,
         } satisfies ImageSection)
         continue
       }
@@ -345,6 +358,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
       // Glossary detection
       const glossaryEntry = tryExtractGlossaryEntry(p)
       if (glossaryEntry) {
+        if (glossaryBuffer.length === 0) glossaryStartLine = line
         glossaryBuffer.push(glossaryEntry)
         continue
       }
@@ -353,13 +367,14 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
       sections.push({
         type: 'paragraph',
         html: phrasingToHtml(p.children as PhrasingContent[]),
+        lineStart: line,
       } satisfies ParagraphSection)
       continue
     }
 
     if (node.type === 'thematicBreak') {
       flushGlossary()
-      sections.push({ type: 'hr' } satisfies HorizontalRuleSection)
+      sections.push({ type: 'hr', lineStart: line } satisfies HorizontalRuleSection)
       continue
     }
   }
@@ -371,6 +386,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
     sections.push({
       type: 'footnotes',
       items: Array.from(footnoteMap.entries()).map(([id, html]) => ({ id, html })),
+      lineStart: firstFootnoteLine,
     } satisfies FootnotesSection)
   }
 
@@ -379,7 +395,7 @@ function walkNodes(nodes: Node[], footnoteMap: Map<string, string>): DashboardSe
 
 // ── public API ─────────────────────────────────────────────────────────────
 
-export function parseMarkdown(content: string, fileName: string): ParsedDocument {
+export function parseMarkdown(content: string, fileName: string, id?: string): ParsedDocument {
   const processor = unified()
     .use(remarkParse)
     .use(remarkFrontmatter, ['yaml'])
@@ -387,14 +403,15 @@ export function parseMarkdown(content: string, fileName: string): ParsedDocument
     .use(remarkMath)
   const tree = processor.parse(content) as Root
 
-  const footnoteMap = collectFootnotes(tree.children as Node[])
-  const sections = walkNodes(tree.children as Node[], footnoteMap)
+  const { map: footnoteMap, firstLine: firstFootnoteLine } = collectFootnotes(tree.children as Node[])
+  const sections = walkNodes(tree.children as Node[], footnoteMap, firstFootnoteLine)
   const headings = sections.filter((s): s is HeadingSection => s.type === 'heading')
 
   return {
-    id: crypto.randomUUID(),
+    id: id ?? crypto.randomUUID(),
     name: fileName.replace(/\.md$/i, ''),
     sections,
     headings,
+    rawMarkdown: content,
   }
 }

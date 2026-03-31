@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { ThemeToggle } from './ThemeToggle'
 import { GoogleSignIn } from './GoogleSignIn'
@@ -50,19 +50,37 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
       .finally(() => setDriveLoading(false))
   }, [auth.isLoggedIn, storage])
 
+  // Drive upload flow: collect files → ask for project name → upload
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null)
+  const [projectNameInput, setProjectNameInput] = useState('')
+  const projectNameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (pendingFiles && projectNameRef.current) projectNameRef.current.focus()
+  }, [pendingFiles])
+
   const onDrop = useCallback(
     (accepted: File[]) => {
       const mdFiles = accepted.filter((f) => f.name.endsWith('.md'))
       if (mdFiles.length === 0) return
       if (auth.isLoggedIn && onDriveUpload) {
-        const projectName = mdFiles[0].name.replace(/\.md$/i, '')
-        onDriveUpload(mdFiles, projectName)
+        // Show the project name prompt
+        setPendingFiles(mdFiles)
+        setProjectNameInput(mdFiles[0].name.replace(/\.md$/i, ''))
       } else {
         onFiles(mdFiles)
       }
     },
     [onFiles, onDriveUpload, auth.isLoggedIn]
   )
+
+  const handleConfirmUpload = () => {
+    const name = projectNameInput.trim()
+    if (!name || !pendingFiles || !onDriveUpload) return
+    onDriveUpload(pendingFiles, name)
+    setPendingFiles(null)
+    setProjectNameInput('')
+  }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -252,6 +270,45 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
         </div>
 
       </div>
+
+      {/* Project name modal */}
+      {pendingFiles && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 bg-black/60 backdrop-blur-sm">
+          <div className="rounded-2xl p-6 w-full max-w-sm shadow-xl" style={{ background: '#13111f', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <h3 className="text-sm font-semibold text-white mb-1">Save to Google Drive</h3>
+            <p className="text-[11px] mb-4" style={{ color: '#6b6490' }}>
+              {pendingFiles.length} {pendingFiles.length === 1 ? 'file' : 'files'} selected. Choose a project name.
+            </p>
+            <input
+              ref={projectNameRef}
+              type="text"
+              value={projectNameInput}
+              onChange={(e) => setProjectNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmUpload(); if (e.key === 'Escape') { setPendingFiles(null); setProjectNameInput('') } }}
+              placeholder="Project name"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none mb-4"
+              style={{ background: '#1c1830', color: '#e2e0ed', border: '1px solid rgba(255,255,255,0.1)' }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setPendingFiles(null); setProjectNameInput('') }}
+                className="px-4 py-2 text-xs font-medium rounded-lg"
+                style={{ color: '#6b6490' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                disabled={!projectNameInput.trim()}
+                className="px-4 py-2 text-xs font-semibold rounded-lg transition-all disabled:opacity-40"
+                style={{ background: '#7c3aed', color: '#ffffff' }}
+              >
+                Upload
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {loading && (

@@ -11,12 +11,11 @@ const initialState: AuthState = {
 export function useAuth() {
   const [auth, setAuth] = useState<AuthState>(initialState)
 
-  // On mount, silently restore session if the user was previously signed in
+  // On mount, restore session from storage — no popup, no network call
   useEffect(() => {
     if (!googleAuth.isAuthAvailable()) return
-    googleAuth.restoreSession().then((state) => {
-      if (state) setAuth(state)
-    })
+    const state = googleAuth.restoreSession()
+    if (state) setAuth(state)
   }, [])
 
   const handleSignIn = useCallback(async () => {

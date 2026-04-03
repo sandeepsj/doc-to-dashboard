@@ -70,7 +70,7 @@ export async function signIn(): Promise<AuthState> {
         accessToken = response.access_token
         try {
           const user = await fetchUserInfo(accessToken)
-          saveSession(user)
+          saveSession(user, accessToken)
           resolve({ isLoggedIn: true, user, accessToken })
         } catch (err) {
           reject(err)
@@ -84,55 +84,45 @@ export async function signIn(): Promise<AuthState> {
   })
 }
 
-// ── Session persistence (user info only — never persist the token) ──────────
+// ── Session persistence ──────────────────────────────────────────────────────
+// User info → localStorage (survives tab close, used to show avatar/name)
+// Access token → sessionStorage (cleared when tab closes, same lifetime as token)
 
-const SESSION_KEY = 'dtd_session'
+const USER_KEY  = 'dtd_user'
+const TOKEN_KEY = 'dtd_token'
 
-export function saveSession(user: GoogleUser): void {
-  try { localStorage.setItem(SESSION_KEY, JSON.stringify(user)) } catch { /* ignore */ }
+export function saveSession(user: GoogleUser, token: string): void {
+  try {
+    localStorage.setItem(USER_KEY, JSON.stringify(user))
+    sessionStorage.setItem(TOKEN_KEY, token)
+  } catch { /* ignore */ }
 }
 
-export function loadSession(): GoogleUser | null {
+export function loadSession(): AuthState | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? (JSON.parse(raw) as GoogleUser) : null
+    const token = sessionStorage.getItem(TOKEN_KEY)
+    const raw   = localStorage.getItem(USER_KEY)
+    if (!token || !raw) return null
+    const user = JSON.parse(raw) as GoogleUser
+    return { isLoggedIn: true, user, accessToken: token }
   } catch { return null }
 }
 
 export function clearSession(): void {
-  try { localStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+  try {
+    localStorage.removeItem(USER_KEY)
+    sessionStorage.removeItem(TOKEN_KEY)
+  } catch { /* ignore */ }
 }
 
 /**
- * Attempt to silently restore a session on page load.
- * Uses prompt:'' so GIS re-issues a token without a popup when the user
- * has already consented. Returns the full AuthState or null on failure.
+ * Restore session from storage — no popup, no network call.
+ * Returns the saved AuthState if both user info and a token are present.
  */
-export async function restoreSession(): Promise<AuthState | null> {
-  const user = loadSession()
-  if (!user) return null
-  const clientId = getClientId()
-  if (!clientId) return null
-
-  await loadGisScript()
-
-  return new Promise((resolve) => {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: SCOPES,
-      callback: (response) => {
-        if (response.error || !response.access_token) {
-          clearSession()
-          resolve(null)
-          return
-        }
-        accessToken = response.access_token
-        resolve({ isLoggedIn: true, user, accessToken })
-      },
-      error_callback: () => { clearSession(); resolve(null) },
-    })
-    tokenClient.requestAccessToken({ prompt: '' })
-  })
+export function restoreSession(): AuthState | null {
+  const state = loadSession()
+  if (state) accessToken = state.accessToken
+  return state
 }
 
 export function signOut(): void {
@@ -162,6 +152,8 @@ export async function refreshToken(): Promise<string> {
       callback: (response) => {
         if (response.error) { reject(new Error(response.error)); return }
         accessToken = response.access_token
+        // Update token in sessionStorage so next refresh also works
+        try { sessionStorage.setItem(TOKEN_KEY, accessToken) } catch { /* ignore */ }
         resolve(accessToken)
       },
       error_callback: (error) => reject(new Error(error.message)),

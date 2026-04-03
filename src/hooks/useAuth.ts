@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { AuthState } from '../types/drive'
 import * as googleAuth from '../services/googleAuth'
 
@@ -10,6 +10,14 @@ const initialState: AuthState = {
 
 export function useAuth() {
   const [auth, setAuth] = useState<AuthState>(initialState)
+
+  // On mount, silently restore session if the user was previously signed in
+  useEffect(() => {
+    if (!googleAuth.isAuthAvailable()) return
+    googleAuth.restoreSession().then((state) => {
+      if (state) setAuth(state)
+    })
+  }, [])
 
   const handleSignIn = useCallback(async () => {
     try {

@@ -70,6 +70,7 @@ export async function signIn(): Promise<AuthState> {
         accessToken = response.access_token
         try {
           const user = await fetchUserInfo(accessToken)
+          saveSession(user)
           resolve({ isLoggedIn: true, user, accessToken })
         } catch (err) {
           reject(err)
@@ -83,12 +84,64 @@ export async function signIn(): Promise<AuthState> {
   })
 }
 
+// ── Session persistence (user info only — never persist the token) ──────────
+
+const SESSION_KEY = 'dtd_session'
+
+export function saveSession(user: GoogleUser): void {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(user)) } catch { /* ignore */ }
+}
+
+export function loadSession(): GoogleUser | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    return raw ? (JSON.parse(raw) as GoogleUser) : null
+  } catch { return null }
+}
+
+export function clearSession(): void {
+  try { localStorage.removeItem(SESSION_KEY) } catch { /* ignore */ }
+}
+
+/**
+ * Attempt to silently restore a session on page load.
+ * Uses prompt:'' so GIS re-issues a token without a popup when the user
+ * has already consented. Returns the full AuthState or null on failure.
+ */
+export async function restoreSession(): Promise<AuthState | null> {
+  const user = loadSession()
+  if (!user) return null
+  const clientId = getClientId()
+  if (!clientId) return null
+
+  await loadGisScript()
+
+  return new Promise((resolve) => {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: (response) => {
+        if (response.error || !response.access_token) {
+          clearSession()
+          resolve(null)
+          return
+        }
+        accessToken = response.access_token
+        resolve({ isLoggedIn: true, user, accessToken })
+      },
+      error_callback: () => { clearSession(); resolve(null) },
+    })
+    tokenClient.requestAccessToken({ prompt: '' })
+  })
+}
+
 export function signOut(): void {
   if (accessToken) {
     try { google.accounts.oauth2.revoke(accessToken) } catch { /* ignore */ }
   }
   accessToken = null
   tokenClient = null
+  clearSession()
 }
 
 export function getAccessToken(): string | null {

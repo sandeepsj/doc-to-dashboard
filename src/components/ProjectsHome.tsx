@@ -161,35 +161,54 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {driveProjects.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => onOpenProject(p.id, p.files, true)}
-                  disabled={loading}
-                  className="group text-left rounded-2xl p-6 transition-all duration-200 border border-violet-700/40 bg-violet-900/20 hover:bg-violet-800/30 hover:border-violet-600/60 hover:shadow-[0_0_40px_rgba(124,58,237,0.18)] disabled:opacity-50 backdrop-blur-sm"
-                >
-                  <div className="flex items-center justify-between mb-5">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(59,130,246,0.3))', border: '1px solid rgba(124,58,237,0.45)' }}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 12H16L14 15H10L8 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                <div key={p.id} className="relative group">
+                  <button
+                    onClick={() => onOpenProject(p.id, p.files, true)}
+                    disabled={loading}
+                    className="w-full text-left rounded-2xl p-6 transition-all duration-200 border border-violet-700/40 bg-violet-900/20 hover:bg-violet-800/30 hover:border-violet-600/60 hover:shadow-[0_0_40px_rgba(124,58,237,0.18)] disabled:opacity-50 backdrop-blur-sm"
+                  >
+                    <div className="flex items-center justify-between mb-5">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(59,130,246,0.3))', border: '1px solid rgba(124,58,237,0.45)' }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M22 12H16L14 15H10L8 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                        </svg>
+                      </div>
+                      <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-violet-300 bg-violet-800/40 border border-violet-700/50">
+                        {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
+                      </span>
+                    </div>
+                    <div className="font-semibold text-white text-[15px] leading-snug mb-2.5 group-hover:text-violet-200 transition-colors pr-8">
+                      {p.name}
+                    </div>
+                    <div className="mt-3 flex items-center gap-1 text-xs text-violet-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                      Open project
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                        <polyline points="9 18 15 12 9 6" />
                       </svg>
                     </div>
-                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-violet-300 bg-violet-800/40 border border-violet-700/50">
-                      {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
-                    </span>
-                  </div>
-                  <div className="font-semibold text-white text-[15px] leading-snug mb-2.5 group-hover:text-violet-200 transition-colors">
-                    {p.name}
-                  </div>
-                  <div className="mt-3 flex items-center gap-1 text-xs text-violet-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                    Open project
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <polyline points="9 18 15 12 9 6" />
+                  </button>
+                  {/* Per-project Drive link — opens this folder directly */}
+                  <a
+                    href={`https://drive.google.com/drive/folders/${p.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Open this project folder in Google Drive"
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute top-4 right-4 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-700/30"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
+                      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
+                      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                      <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
+                      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
                     </svg>
-                  </div>
-                </button>
+                  </a>
+                </div>
               ))}
             </div>
           </div>

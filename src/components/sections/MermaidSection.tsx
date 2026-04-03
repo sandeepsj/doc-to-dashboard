@@ -67,9 +67,11 @@ const MERMAID_CANONICAL: Record<string, string> = {
 /**
  * Fix known Mermaid syntax limitations before rendering.
  * - quadrantChart: strip parentheses from point labels (lexer rejects them)
+ * - sequenceDiagram: replace semicolons in Note/Note over text (lexer treats ; as terminator)
  */
 function sanitizeMermaid(source: string): string {
   const first = source.trimStart().toLowerCase()
+
   if (first.startsWith('quadrantchart')) {
     return source
       .split('\n')
@@ -85,6 +87,24 @@ function sanitizeMermaid(source: string): string {
       })
       .join('\n')
   }
+
+  if (first.startsWith('sequencediagram')) {
+    return source
+      .split('\n')
+      .map((line) => {
+        // Note over / Note left of / Note right of lines: replace ; with ,
+        if (/^\s*note\b/i.test(line)) {
+          // Replace semicolons only in the text portion (after the colon)
+          const colonIdx = line.indexOf(':')
+          if (colonIdx !== -1) {
+            return line.slice(0, colonIdx + 1) + line.slice(colonIdx + 1).replace(/;/g, ',')
+          }
+        }
+        return line
+      })
+      .join('\n')
+  }
+
   return source
 }
 

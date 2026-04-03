@@ -173,6 +173,7 @@ export function MermaidSection({ section }: Props) {
   }, [section.value, uid])
 
   if (error) {
+    const isStaleCache = error.includes('Failed to fetch dynamically imported module')
     return (
       <div
         className="rounded-2xl overflow-hidden shadow-sm"
@@ -182,12 +183,33 @@ export function MermaidSection({ section }: Props) {
           <span className="text-xs font-mono" style={{ color: 'var(--text-faint)' }}>{section.lang}</span>
           <span className="text-xs ml-auto" style={{ color: '#ef4444' }}>Render error</span>
         </div>
-        <pre className="p-4 text-xs overflow-x-auto font-mono" style={{ color: 'var(--text-secondary)', background: 'var(--bg-card)' }}>
-          {section.value}
-        </pre>
-        <div className="px-4 py-2 text-xs" style={{ color: '#ef4444', background: 'var(--bg-subtle)', borderTop: '1px solid var(--border)' }}>
-          {error}
-        </div>
+        {isStaleCache ? (
+          <div className="px-4 py-5 flex flex-col items-center gap-3 text-center">
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Diagram module could not be loaded — the page may be out of date.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+              style={{ background: 'var(--bg-subtle)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              Reload page
+            </button>
+          </div>
+        ) : (
+          <>
+            <pre className="p-4 text-xs overflow-x-auto font-mono" style={{ color: 'var(--text-secondary)', background: 'var(--bg-card)' }}>
+              {section.value}
+            </pre>
+            <div className="px-4 py-2 text-xs" style={{ color: '#ef4444', background: 'var(--bg-subtle)', borderTop: '1px solid var(--border)' }}>
+              {error}
+            </div>
+          </>
+        )}
       </div>
     )
   }

@@ -70,7 +70,7 @@ export async function signIn(): Promise<AuthState> {
         accessToken = response.access_token
         try {
           const user = await fetchUserInfo(accessToken)
-          saveSession(user, accessToken)
+          saveSession(user, accessToken, response.expires_in)
           resolve({ isLoggedIn: true, user, accessToken })
         } catch (err) {
           reject(err)
@@ -86,21 +86,35 @@ export async function signIn(): Promise<AuthState> {
 
 // ── Session persistence ──────────────────────────────────────────────────────
 // User info → localStorage (survives tab close, used to show avatar/name)
-// Access token → sessionStorage (cleared when tab closes, same lifetime as token)
+// Access token + expiry → localStorage (survives tab/app switches on mobile)
 
-const USER_KEY  = 'dtd_user'
-const TOKEN_KEY = 'dtd_token'
+const USER_KEY    = 'dtd_user'
+const TOKEN_KEY   = 'dtd_token'
+const EXPIRES_KEY = 'dtd_token_expires'
 
-export function saveSession(user: GoogleUser, token: string): void {
+export function saveSession(user: GoogleUser, token: string, expiresIn?: number): void {
   try {
     localStorage.setItem(USER_KEY, JSON.stringify(user))
-    sessionStorage.setItem(TOKEN_KEY, token)
+    localStorage.setItem(TOKEN_KEY, token)
+    if (expiresIn) {
+      // Store absolute expiry time with 60s buffer to avoid edge-case usage of a just-expired token
+      const expiresAt = Date.now() + (expiresIn - 60) * 1000
+      localStorage.setItem(EXPIRES_KEY, String(expiresAt))
+    }
   } catch { /* ignore */ }
+}
+
+function isTokenExpired(): boolean {
+  try {
+    const expiresAt = localStorage.getItem(EXPIRES_KEY)
+    if (!expiresAt) return true
+    return Date.now() >= Number(expiresAt)
+  } catch { return true }
 }
 
 export function loadSession(): AuthState | null {
   try {
-    const token = sessionStorage.getItem(TOKEN_KEY)
+    const token = localStorage.getItem(TOKEN_KEY)
     const raw   = localStorage.getItem(USER_KEY)
     if (!token || !raw) return null
     const user = JSON.parse(raw) as GoogleUser
@@ -111,18 +125,51 @@ export function loadSession(): AuthState | null {
 export function clearSession(): void {
   try {
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(EXPIRES_KEY)
+    // Clean up legacy sessionStorage key if present
     sessionStorage.removeItem(TOKEN_KEY)
   } catch { /* ignore */ }
 }
 
 /**
  * Restore session from storage — no popup, no network call.
- * Returns the saved AuthState if both user info and a token are present.
+ * Returns the saved AuthState only if a non-expired token is present.
  */
 export function restoreSession(): AuthState | null {
   const state = loadSession()
-  if (state) accessToken = state.accessToken
+  if (!state) return null
+  if (isTokenExpired()) return null
+  accessToken = state.accessToken
   return state
+}
+
+/**
+ * Check if we have saved user info (even with an expired token).
+ * Used to decide whether to attempt a silent refresh.
+ */
+export function hasSavedUser(): boolean {
+  try {
+    return !!localStorage.getItem(USER_KEY)
+  } catch { return false }
+}
+
+/**
+ * Try to silently refresh the token when we have saved user info
+ * but the token has expired. Returns the refreshed AuthState or null.
+ */
+export async function tryRefreshSession(): Promise<AuthState | null> {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    if (!raw) return null
+    const user = JSON.parse(raw) as GoogleUser
+    const newToken = await refreshToken()
+    return { isLoggedIn: true, user, accessToken: newToken }
+  } catch {
+    // Silent refresh failed (popup blocked, no prior consent, etc.)
+    clearSession()
+    return null
+  }
 }
 
 export function signOut(): void {
@@ -152,8 +199,14 @@ export async function refreshToken(): Promise<string> {
       callback: (response) => {
         if (response.error) { reject(new Error(response.error)); return }
         accessToken = response.access_token
-        // Update token in sessionStorage so next refresh also works
-        try { sessionStorage.setItem(TOKEN_KEY, accessToken) } catch { /* ignore */ }
+        // Update token + expiry in localStorage
+        try {
+          localStorage.setItem(TOKEN_KEY, accessToken)
+          if (response.expires_in) {
+            const expiresAt = Date.now() + (response.expires_in - 60) * 1000
+            localStorage.setItem(EXPIRES_KEY, String(expiresAt))
+          }
+        } catch { /* ignore */ }
         resolve(accessToken)
       },
       error_callback: (error) => reject(new Error(error.message)),

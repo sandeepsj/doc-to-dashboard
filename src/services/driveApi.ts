@@ -151,6 +151,18 @@ export async function deleteFile(token: string, fileId: string): Promise<void> {
   await authenticatedFetch(token, `${DRIVE_API}/files/${fileId}`, { method: 'DELETE' })
 }
 
+// ── Shared-with-me folders ───────────────────────────────────────────────
+
+export async function listSharedFolders(token: string): Promise<{ id: string; name: string }[]> {
+  const q = `sharedWithMe=true and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  const res = await authenticatedFetch(
+    token,
+    `${DRIVE_API}/files?q=${encodeURIComponent(q)}&fields=files(id,name)&orderBy=name`
+  )
+  const data = await res.json()
+  return (data.files ?? []).map((f: { id: string; name: string }) => ({ id: f.id, name: f.name }))
+}
+
 // ── Permission operations (sharing) ──────────────────────────────────────
 
 export async function shareFile(

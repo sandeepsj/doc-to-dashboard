@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { shareFile, listPermissions, removePermission } from '../driveApi'
+import { shareFile, listPermissions, removePermission, listSharedFolders } from '../driveApi'
 
 // Mock googleAuth to prevent actual token refresh
 vi.mock('../googleAuth', () => ({
@@ -14,6 +14,30 @@ const FILE_ID = 'folder-123'
 
 beforeEach(() => {
   mockFetch.mockReset()
+})
+
+describe('listSharedFolders', () => {
+  it('queries Drive for sharedWithMe folders', async () => {
+    const folders = [
+      { id: 'shared-1', name: 'Project A' },
+      { id: 'shared-2', name: 'Project B' },
+    ]
+    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ files: folders }) })
+
+    const result = await listSharedFolders(TOKEN)
+
+    expect(result).toEqual(folders)
+    const [url] = mockFetch.mock.calls[0]
+    expect(url).toContain('sharedWithMe')
+    expect(url).toContain('application%2Fvnd.google-apps.folder')
+  })
+
+  it('returns empty array when no shared folders', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({}) })
+
+    const result = await listSharedFolders(TOKEN)
+    expect(result).toEqual([])
+  })
 })
 
 describe('shareFile', () => {

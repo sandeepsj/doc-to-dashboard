@@ -4,6 +4,7 @@ import { ThemeToggle } from './ThemeToggle'
 import { GoogleSignIn } from './GoogleSignIn'
 import { ShareProjectModal } from './ShareProjectModal'
 import { useAuthContext } from '../contexts/AuthContext'
+import { listSharedFolders, listFilesInFolder } from '../services/driveApi'
 import type { ProjectInfo } from '../backends/storageProvider'
 
 interface ProjectMeta {
@@ -50,6 +51,35 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
       .catch(() => setDriveProjects([]))
       .finally(() => setDriveLoading(false))
   }, [auth.isLoggedIn, storage])
+
+  // Load projects shared with me via Drive
+  const [sharedProjects, setSharedProjects] = useState<ProjectInfo[]>([])
+  const [sharedLoading, setSharedLoading] = useState(false)
+
+  useEffect(() => {
+    if (!auth.isLoggedIn || !auth.accessToken) {
+      setSharedProjects([])
+      return
+    }
+    setSharedLoading(true)
+    const token = auth.accessToken
+    listSharedFolders(token)
+      .then(async (folders) => {
+        const projects: ProjectInfo[] = await Promise.all(
+          folders.map(async (folder) => {
+            const files = await listFilesInFolder(token, folder.id)
+            return {
+              id: folder.id,
+              name: folder.name,
+              files: files.filter((f) => f.name.endsWith('.md')).map((f) => f.name),
+            }
+          })
+        )
+        setSharedProjects(projects.filter((p) => p.files.length > 0))
+      })
+      .catch(() => setSharedProjects([]))
+      .finally(() => setSharedLoading(false))
+  }, [auth.isLoggedIn, auth.accessToken])
 
   // Share modal state
   const [shareProject, setShareProject] = useState<ProjectInfo | null>(null)
@@ -194,8 +224,8 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
                       </svg>
                     </div>
                   </button>
-                  {/* Per-project actions */}
-                  <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Per-project actions — always visible for touch devices */}
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={(e) => { e.stopPropagation(); setShareProject(p) }}
                       title="Share this project"
@@ -227,6 +257,64 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
                     </a>
                   </div>
                 </div>
+              ))}
+            </div>
+          </div>
+        ) : null)}
+
+        {/* Shared with me */}
+        {auth.isLoggedIn && (sharedLoading ? (
+          <div className="flex items-center justify-center py-8 mb-8">
+            <svg className="animate-spin h-5 w-5 text-violet-400" viewBox="0 0 24 24" fill="none">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
+        ) : sharedProjects.length > 0 ? (
+          <div className="mb-14">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-ink-500 mb-5 px-1 flex items-center gap-2">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              Shared with me
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sharedProjects.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onOpenProject(p.id, p.files, true)}
+                  disabled={loading}
+                  className="group text-left rounded-2xl p-6 transition-all duration-200 border border-blue-700/40 bg-blue-900/20 hover:bg-blue-800/30 hover:border-blue-600/60 hover:shadow-[0_0_40px_rgba(59,130,246,0.18)] disabled:opacity-50 backdrop-blur-sm"
+                >
+                  <div className="flex items-center justify-between mb-5">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center"
+                      style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.4), rgba(124,58,237,0.3))', border: '1px solid rgba(59,130,246,0.45)' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </div>
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-blue-300 bg-blue-800/40 border border-blue-700/50">
+                      {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
+                    </span>
+                  </div>
+                  <div className="font-semibold text-white text-[15px] leading-snug mb-2.5 group-hover:text-blue-200 transition-colors">
+                    {p.name}
+                  </div>
+                  <div className="mt-3 flex items-center gap-1 text-xs text-blue-400 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    Open project
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <polyline points="9 18 15 12 9 6" />
+                    </svg>
+                  </div>
+                </button>
               ))}
             </div>
           </div>

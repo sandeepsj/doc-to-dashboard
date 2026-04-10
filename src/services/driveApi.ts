@@ -1,4 +1,4 @@
-import type { DriveFileMeta } from '../types/drive'
+import type { DriveFileMeta, DrivePermission, DrivePermissionRole } from '../types/drive'
 import { refreshToken } from './googleAuth'
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3'
@@ -149,4 +149,45 @@ export async function uploadFile(
 
 export async function deleteFile(token: string, fileId: string): Promise<void> {
   await authenticatedFetch(token, `${DRIVE_API}/files/${fileId}`, { method: 'DELETE' })
+}
+
+// ── Permission operations (sharing) ──────────────────────────────────────
+
+export async function shareFile(
+  token: string,
+  fileId: string,
+  email: string,
+  role: DrivePermissionRole,
+  notify: boolean = true
+): Promise<DrivePermission> {
+  const url = `${DRIVE_API}/files/${fileId}/permissions` +
+    `?sendNotificationEmail=${notify}&fields=id,type,role,emailAddress,displayName`
+  const res = await authenticatedFetch(token, url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'user', role, emailAddress: email }),
+  })
+  return res.json()
+}
+
+export async function listPermissions(
+  token: string,
+  fileId: string
+): Promise<DrivePermission[]> {
+  const res = await authenticatedFetch(
+    token,
+    `${DRIVE_API}/files/${fileId}/permissions?fields=permissions(id,type,role,emailAddress,displayName)`
+  )
+  const data = await res.json()
+  return data.permissions ?? []
+}
+
+export async function removePermission(
+  token: string,
+  fileId: string,
+  permissionId: string
+): Promise<void> {
+  await authenticatedFetch(token, `${DRIVE_API}/files/${fileId}/permissions/${permissionId}`, {
+    method: 'DELETE',
+  })
 }

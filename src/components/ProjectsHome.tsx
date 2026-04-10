@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { ThemeToggle } from './ThemeToggle'
 import { GoogleSignIn } from './GoogleSignIn'
+import { ShareProjectModal } from './ShareProjectModal'
 import { useAuthContext } from '../contexts/AuthContext'
 import type { ProjectInfo } from '../backends/storageProvider'
 
@@ -49,6 +50,9 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
       .catch(() => setDriveProjects([]))
       .finally(() => setDriveLoading(false))
   }, [auth.isLoggedIn, storage])
+
+  // Share modal state
+  const [shareProject, setShareProject] = useState<ProjectInfo | null>(null)
 
   // Drive upload flow: collect files → ask for project name → upload
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null)
@@ -190,24 +194,38 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
                       </svg>
                     </div>
                   </button>
-                  {/* Per-project Drive link — opens this folder directly */}
-                  <a
-                    href={`https://drive.google.com/drive/folders/${p.id}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Open this project folder in Google Drive"
-                    onClick={(e) => e.stopPropagation()}
-                    className="absolute top-4 right-4 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-700/30"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
-                      <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
-                      <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
-                      <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
-                      <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
-                      <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
-                    </svg>
-                  </a>
+                  {/* Per-project actions */}
+                  <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShareProject(p) }}
+                      title="Share this project"
+                      className="p-1.5 rounded-lg hover:bg-violet-700/30"
+                      aria-label={`Share ${p.name}`}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                        <polyline points="16 6 12 2 8 6" />
+                        <line x1="12" y1="2" x2="12" y2="15" />
+                      </svg>
+                    </button>
+                    <a
+                      href={`https://drive.google.com/drive/folders/${p.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open this project folder in Google Drive"
+                      onClick={(e) => e.stopPropagation()}
+                      className="p-1.5 rounded-lg hover:bg-violet-700/30"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                        <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
+                        <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
+                        <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                        <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
+                        <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                      </svg>
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
@@ -360,6 +378,16 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
             <span className="text-sm text-ink-300">Loading project…</span>
           </div>
         </div>
+      )}
+
+      {/* Share project modal */}
+      {shareProject && auth.accessToken && (
+        <ShareProjectModal
+          projectName={shareProject.name}
+          folderId={shareProject.id}
+          accessToken={auth.accessToken}
+          onClose={() => setShareProject(null)}
+        />
       )}
     </div>
   )

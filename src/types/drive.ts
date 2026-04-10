@@ -23,3 +23,13 @@ export interface DriveProject {
   name: string
   files: DriveFileMeta[]
 }
+
+export type DrivePermissionRole = 'reader' | 'commenter' | 'writer'
+
+export interface DrivePermission {
+  id: string
+  type: string
+  role: DrivePermissionRole | string
+  emailAddress?: string
+  displayName?: string
+}

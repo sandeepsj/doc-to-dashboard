@@ -84,6 +84,15 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
   // Share modal state
   const [shareProject, setShareProject] = useState<ProjectInfo | null>(null)
 
+  // Per-card overflow menu state
+  const [openMenu, setOpenMenu] = useState<string | null>(null)
+  useEffect(() => {
+    if (!openMenu) return
+    const close = () => setOpenMenu(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [openMenu])
+
   // Drive upload flow: collect files → ask for project name → upload
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null)
   const [projectNameInput, setProjectNameInput] = useState('')
@@ -210,9 +219,24 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
                           <path d="M22 12H16L14 15H10L8 12H2" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
                         </svg>
                       </div>
-                      <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-violet-300 bg-violet-800/40 border border-violet-700/50">
-                        {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          title="Stored in Google Drive"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-[7px] bg-white/5 border border-white/10"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                            <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
+                            <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                            <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
+                            <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                          </svg>
+                        </span>
+                        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full text-violet-300 bg-violet-800/40 border border-violet-700/50">
+                          {p.files.length} {p.files.length === 1 ? 'file' : 'files'}
+                        </span>
+                      </div>
                     </div>
                     <div className="font-semibold text-white text-[15px] leading-snug mb-2.5 group-hover:text-violet-200 transition-colors pr-8">
                       {p.name}
@@ -224,37 +248,56 @@ export function ProjectsHome({ onOpenProject, onFiles, onDriveUpload, theme, onT
                       </svg>
                     </div>
                   </button>
-                  {/* Per-project actions — always visible for touch devices */}
-                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                  <div className="absolute top-3 right-3">
                     <button
-                      onClick={(e) => { e.stopPropagation(); setShareProject(p) }}
-                      title="Share this project"
-                      className="p-1.5 rounded-lg hover:bg-violet-700/30"
-                      aria-label={`Share ${p.name}`}
+                      onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === p.id ? null : p.id) }}
+                      aria-label={`More actions for ${p.name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={openMenu === p.id}
+                      className="w-7 h-7 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] text-violet-300 inline-flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity"
                     >
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                        <polyline points="16 6 12 2 8 6" />
-                        <line x1="12" y1="2" x2="12" y2="15" />
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>
                       </svg>
                     </button>
-                    <a
-                      href={`https://drive.google.com/drive/folders/${p.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="Open this project folder in Google Drive"
-                      onClick={(e) => e.stopPropagation()}
-                      className="p-1.5 rounded-lg hover:bg-violet-700/30"
-                    >
-                      <svg width="13" height="13" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
-                        <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
-                        <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
-                        <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
-                        <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
-                        <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
-                      </svg>
-                    </a>
+                    {openMenu === p.id && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 mt-1 min-w-[180px] rounded-xl bg-[#1a1527] border border-violet-700/40 shadow-xl backdrop-blur-md py-1 z-10"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          role="menuitem"
+                          onClick={(e) => { e.stopPropagation(); setOpenMenu(null); setShareProject(p) }}
+                          className="w-full text-left px-3 py-2 text-sm text-violet-100 hover:bg-violet-800/40 flex items-center gap-2"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                            <polyline points="16 6 12 2 8 6" />
+                            <line x1="12" y1="2" x2="12" y2="15" />
+                          </svg>
+                          Share
+                        </button>
+                        <a
+                          role="menuitem"
+                          href={`https://drive.google.com/drive/folders/${p.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => { e.stopPropagation(); setOpenMenu(null) }}
+                          className="px-3 py-2 text-sm text-violet-100 hover:bg-violet-800/40 flex items-center gap-2"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8H1.1c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                            <path d="M43.65 25L29.9 1.2C28.55 2 27.4 3.1 26.6 4.5L1.2 48.55A9.06 9.06 0 000 53.05h27.5z" fill="#00ac47"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8l5.85 11.2z" fill="#ea4335"/>
+                            <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                            <path d="M59.8 53.05H27.5L13.75 76.85c1.35.8 2.9 1.15 4.5 1.15h50.8c1.6 0 3.15-.4 4.5-1.15z" fill="#2684fc"/>
+                            <path d="M73.4 26.5l-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25l16.15 28.05H87.2c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                          </svg>
+                          Open in Drive
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

@@ -11,7 +11,7 @@ import { MarkdownEditor } from './MarkdownEditor'
 import { useReader } from '../hooks/useReader'
 import { useComments } from '../hooks/useComments'
 import { useAuthContext } from '../contexts/AuthContext'
-import { LocalServerBackend } from '../backends/localServerBackend'
+import { createTtsBackend } from '../backends/ttsBackend'
 import type { ParsedDocument } from '../types'
 
 interface Props {
@@ -34,8 +34,8 @@ export function Dashboard({ documents, activeDocId, activeProjectId, onChangeAct
   const [commentTargetIndex, setCommentTargetIndex] = useState<number | null>(null)
   const mainRef = useRef<HTMLDivElement>(null)
 
-  // Reader — uses local read-loud server directly
-  const backendRef = useRef(new LocalServerBackend())
+  // Reader — backend is chosen by VITE_TTS_BACKEND (defaults to models-registry)
+  const backendRef = useRef(createTtsBackend())
   const { status: readerStatus, activeSectionIndex, speed, voice, voices, startReading, togglePause, stopReading, setSpeed, setVoice, refreshVoices } = useReader({
     backend: backendRef.current,
     sections: activeDoc.sections,
